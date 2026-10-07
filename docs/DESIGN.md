@@ -87,7 +87,7 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 - API 키: Android Keystore AES-256-GCM(`SecureStore`)으로 암호화해 DataStore에 저장.
 - 네트워크 보안 구성: 시스템 CA + **사용자 설치 CA** 신뢰(자체 서명 HTTPS NAS 지원), 평문 허용
   (LAN 전제) + 앱 설정으로 차단 가능. 외부 노출 서버는 HTTPS 권고(UI 경고).
-- 컴포넌트 노출 최소: 런처 Activity만 exported. FileProvider는 `cache/updates/`만.
+- 컴포넌트 노출 최소: 런처 Activity만 exported, `taskAffinity=""`(태스크 하이재킹 완화). FileProvider는 `cache/updates/`만.
 - R8 minify + 리소스 축소, `dependenciesInfo` 비활성(Play 전용 암호화 블롭 제거).
 - CI: CodeQL, Trivy(의존성/시크릿/설정), gitleaks, Android Lint(SARIF), mobsfscan,
   Dependency Review. Release 워크플로는 Trivy CRITICAL/HIGH(수정판 존재)에서 중단.

@@ -80,6 +80,14 @@
 ### C-5. 세 번째 실행 (커밋 a4412e2): CI·Security Scan 전부 성공
 - Trivy 범위를 배포 의존성으로 좁힌 뒤 게이트 통과. 이 시점의 상태가 "릴리스 가능" 기준선.
 
+### C-6. mobsfscan 결과 (run 37569641741) 와 조치
+- ERROR `android_task_hijacking1/2`: `launchMode="singleTask"` → StrandHogg 류 태스크 하이재킹 경고.
+  **조치**: launchMode 제거(기본 standard) + `android:taskAffinity=""` (커밋 참조).
+- ERROR `android_manifest_base_config_cleartext`, `..._trust_user_certs`: NAS 시나리오상 의도된 설계 → `.mobsf`에서
+  ignore + SECURITY.md "수용한 위험"에 근거 기록.
+- INFO 6건(인증서 투명성, 루트 탐지, SSL 피닝, 탭재킹, 스크린샷 방지, SafetyNet): 개인용 뷰어에 해당 없음.
+- 참고: mobsfscan 결과는 아티팩트 대신 **작업 로그**(job id)에서 RULE ID/SEVERITY 표를 파싱해 읽었다(B-3).
+
 ## D. 라이브러리 API 함정 (컴파일 전 확인한 가정)
 - **minSdk는 28**: 업데이트 검증에 쓰는 `PackageInfo.signingInfo`, `longVersionCode`, `GET_SIGNING_CERTIFICATES`가
   API 28. minSdk 26이면 Lint `NewApi` 오류로 CI 실패. (Galaxy 2018년 이후 기기 모두 해당)

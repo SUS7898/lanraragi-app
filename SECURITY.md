@@ -10,5 +10,14 @@
 `.github/workflows/security.yml` — CodeQL, Trivy(의존성/시크릿/설정), gitleaks, Android Lint, mobsfscan,
 Dependency Review. `release.yml`은 Trivy에서 수정판이 있는 CRITICAL/HIGH 취약점이 있으면 릴리스를 중단한다.
 
+## 수용한 위험 (의도된 설계, 스캐너가 경고함)
+| 항목 | 이유 | 완화책 |
+|---|---|---|
+| 평문 HTTP 허용 (`cleartextTrafficPermitted="true"`) | NAS의 LANraragi는 보통 `http://192.168.x.x:3000` | 설정의 "평문 HTTP 허용" 스위치로 런타임 차단 가능, UI에 http 경고 표시 |
+| 사용자 설치 CA 신뢰 (`<certificates src="user"/>`) | 자체 서명 HTTPS NAS 지원 | 사용자가 기기에 CA를 직접 설치해야만 적용됨 |
+| 루트 탐지·SSL 피닝·스크린샷 방지·SafetyNet 없음 (mobsfscan INFO) | 개인용 뷰어; 서버 주소는 사용자가 정하므로 피닝 불가 | 해당 없음 |
+
+`.mobsf` 파일에서 위 두 ERROR 규칙을 무시 처리하고 그 근거를 적어 두었다.
+
 ## 취약점 제보
 이 저장소의 Security Advisories(비공개) 또는 이슈로 제보해 주세요. 영향 범위와 재현 방법을 포함하면 좋습니다.

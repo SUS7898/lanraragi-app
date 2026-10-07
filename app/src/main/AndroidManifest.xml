@@ -16,11 +16,12 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.LRRViewer">
 
+        <!-- taskAffinity="" + default launchMode mitigate task hijacking (StrandHogg); flagged by mobsfscan otherwise. -->
         <activity
             android:name=".MainActivity"
             android:configChanges="orientation|screenSize|screenLayout|keyboardHidden|smallestScreenSize|uiMode"
             android:exported="true"
-            android:launchMode="singleTask"
+            android:taskAffinity=""
             android:windowSoftInputMode="adjustResize">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />

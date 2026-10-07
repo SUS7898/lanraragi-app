@@ -1,0 +1,9 @@
+# mobsfscan configuration (https://github.com/MobSF/mobsfscan#configure-mobsfscan)
+# Rules listed here are ACCEPTED RISKS, documented in SECURITY.md ("수용한 위험").
+ignore-rules:
+  # The app talks to a NAS on the local network; such servers are usually plain HTTP.
+  # Cleartext is additionally gated at runtime by the "평문 HTTP 허용" setting (LrrAuthInterceptor).
+  - android_manifest_base_config_cleartext
+  # A NAS with a self-signed HTTPS certificate only works if the user-installed CA is trusted.
+  # The user must deliberately install that CA on the device.
+  - android_manifest_base_config_trust_user_certs
