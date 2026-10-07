@@ -1,0 +1,198 @@
+name: Security Scan
+
+# Static security analysis of the app and its dependency graph.
+#   * CodeQL (java-kotlin, security-extended queries)
+#   * Trivy  (dependency vulnerabilities via gradle.lockfile, secrets, misconfig)
+#   * gitleaks (secrets in git history)
+#   * Android Lint security checks (SARIF)
+#   * mobsfscan (Android-specific static security rules, SARIF)
+#   * Dependency Review on pull requests
+# SARIF uploads need GitHub code scanning (free for public repos); on a private repo without
+# Advanced Security those steps are allowed to fail and the reports are kept as artifacts.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+  pull-requests: read
+
+concurrency:
+  group: security-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  codeql:
+    name: CodeQL (Kotlin/Java)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-35 build-tools;35.0.0"
+          accept-android-sdk-licenses: true
+      - uses: gradle/actions/setup-gradle@v4
+      - uses: github/codeql-action/init@v3
+        continue-on-error: true
+        id: init
+        with:
+          languages: java-kotlin
+          queries: security-extended
+      - name: Build for CodeQL
+        if: steps.init.outcome == 'success'
+        run: ./gradlew --no-daemon --no-configuration-cache :app:assembleDebug
+      - uses: github/codeql-action/analyze@v3
+        if: steps.init.outcome == 'success'
+        continue-on-error: true
+        with:
+          category: codeql
+
+  dependencies:
+    name: Trivy (dependencies · secrets · misconfig)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-35 build-tools;35.0.0"
+          accept-android-sdk-licenses: true
+      - uses: gradle/actions/setup-gradle@v4
+      - name: Write gradle.lockfile for the scanner
+        run: ./gradlew --no-daemon :app:resolveAndLockAll --write-locks --no-configuration-cache && ls -la app/gradle.lockfile
+      - name: Trivy (SARIF, all severities)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret,misconfig
+          format: sarif
+          output: trivy.sarif
+          severity: CRITICAL,HIGH,MEDIUM,LOW
+          exit-code: "0"
+      - uses: github/codeql-action/upload-sarif@v3
+        continue-on-error: true
+        with:
+          sarif_file: trivy.sarif
+          category: trivy
+      - name: Trivy (fail on fixable CRITICAL/HIGH)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: fs
+          scan-ref: .
+          scanners: vuln,secret
+          format: table
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: "1"
+          skip-setup-trivy: true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: trivy-report
+          path: |
+            trivy.sarif
+            app/gradle.lockfile
+          retention-days: 30
+
+  gitleaks:
+    name: gitleaks (secrets in history)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}
+
+  android-lint:
+    name: Android Lint (release)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: "platforms;android-35 build-tools;35.0.0"
+          accept-android-sdk-licenses: true
+      - uses: gradle/actions/setup-gradle@v4
+      - run: ./gradlew --no-daemon --stacktrace :app:lintRelease
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: app/build/reports/lint-results-release.sarif
+          category: android-lint
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-lint-report
+          path: app/build/reports/
+          retention-days: 30
+
+  mobsfscan:
+    name: mobsfscan (Android static rules)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install --quiet mobsfscan
+      - name: Run mobsfscan
+        run: |
+          mobsfscan --sarif --output mobsfscan.sarif app/src/main || true
+          mobsfscan --json --output mobsfscan.json app/src/main || true
+          mobsfscan app/src/main || true
+      - uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        continue-on-error: true
+        with:
+          sarif_file: mobsfscan.sarif
+          category: mobsfscan
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: mobsfscan-report
+          path: |
+            mobsfscan.sarif
+            mobsfscan.json
+          retention-days: 30
+
+  dependency-review:
+    name: Dependency Review (PR)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/dependency-review-action@v4
+        with:
+          fail-on-severity: high
+          comment-summary-in-pr: on-failure

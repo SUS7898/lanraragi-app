@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  A NAS on the local network is usually reachable only over plain HTTP, so cleartext is
+  permitted here. The app additionally enforces the user's "allow HTTP" setting at runtime
+  (see LrrAuthInterceptor). User-installed CA certificates are trusted so that a NAS with a
+  self-signed HTTPS certificate works once its CA is installed on the device.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
