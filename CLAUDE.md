@@ -28,6 +28,8 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
   (`mcp__github__actions_list` / `actions_get` / `get_job_logs`), 실패 로그로 수정 → 다시 push.
   `workflow_dispatch`로 수동 실행도 가능 (`CI`, `Security Scan`, `Release`).
 - 로컬 PC(Android Studio)에서는 `./gradlew :app:testDebugUnitTest :app:assembleDebug`.
+  Windows에서는 PowerShell에서 `.\gradlew.bat …`(Git Bash의 `./gradlew`는 한글 경로가 깨짐). 한글 경로·hosts 광고 차단과
+  관련된 함정과 사용자 전역 `~/.gradle/gradle.properties` 설정은 `docs/TROUBLESHOOTING.md` §F.
 - 릴리스: `git tag vX.Y.Z && git push origin vX.Y.Z` → `Release` 워크플로가 서명 APK +
   `SHA256SUMS.txt`를 GitHub Release에 올림 → 앱이 자동 감지. 저장소 secrets 필요
   (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).

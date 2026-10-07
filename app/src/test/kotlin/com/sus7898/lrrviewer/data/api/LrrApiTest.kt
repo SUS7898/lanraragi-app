@@ -20,11 +20,14 @@ class LrrApiTest {
     private lateinit var server: MockWebServer
     private lateinit var settings: MutableStateFlow<AppSettings>
     private lateinit var api: LrrApi
+    private val baseUrl: String get() = "http://localhost:${server.port}"
 
     @Before
     fun setUp() {
         server = MockWebServer().apply { start() }
-        settings = MutableStateFlow(AppSettings(serverUrl = server.url("/").toString(), apiKey = "secret-key"))
+        // Do not use server.url(): it reverse-resolves 127.0.0.1 and an ad-blocking hosts file can turn that
+        // into an unrelated host name (see docs/TROUBLESHOOTING.md F-3).
+        settings = MutableStateFlow(AppSettings(serverUrl = baseUrl, apiKey = "secret-key"))
         val client = OkHttpClient.Builder().addInterceptor(LrrAuthInterceptor(settings)).build()
         api = LrrApi(client, settings)
     }
@@ -78,7 +81,7 @@ class LrrApiTest {
         val files = api.files("abc")
         val pages = api.resolvePages(files.pages)
         assertEquals(2, pages.size)
-        assertTrue(pages[0].startsWith(server.url("/").toString().trimEnd('/') + "/api/archives/abc/page?path=00.jpg"))
+        assertTrue(pages[0].startsWith("$baseUrl/api/archives/abc/page?path=00.jpg"))
     }
 
     @Test

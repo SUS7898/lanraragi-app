@@ -85,6 +85,9 @@ GitHub Release 게시까지 수행합니다. 앱의 versionName/versionCode는 �
 - NAS가 LAN 전용(`http://`)이면 같은 Wi-Fi 또는 VPN(예: Tailscale)에서 사용하세요. 인터넷에 노출된 서버는 HTTPS를 권장하며,
   설정에서 "평문 HTTP 허용"을 끄면 http 연결이 모두 차단됩니다.
 - 자체 서명 인증서를 쓰는 HTTPS NAS는 기기에 CA 인증서를 설치하면 동작합니다(사용자 CA 신뢰).
+- Synology 역방향 프록시(443, HTTPS)로 노출한 경우 서버 주소에 `https://도메인`만 입력하면 됩니다(포트 생략 = 443, 서브패스는
+  `https://도메인/lrr`처럼 그대로). Let's Encrypt 인증서면 추가 설정이 없고, 시놀로지 자체 서명 인증서면 위처럼 CA를 기기에 설치합니다.
+  설정에서 "평문 HTTP 허용"을 꺼 두면 실수로 http로 붙는 일을 막을 수 있습니다.
 - No-Fun 모드 서버는 API 키가 필수입니다.
 
 ## 라이선스

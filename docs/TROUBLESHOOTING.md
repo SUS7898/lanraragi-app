@@ -165,3 +165,39 @@
   로딩 표시는 `ZoomableImageState.isImageDisplayed`.
 - `PendingIntent.FLAG_MUTABLE`은 API 31+에서만 OR 할 것(설치 결과 인텐트는 가변이어야 함).
 - `PackageManager.getPackageArchiveInfo`/`getPackageInfo`는 API 33+에서 `PackageInfoFlags` 오버로드 사용.
+
+## F. 로컬 PC 개발 환경 (Windows 11, JDK 17 Corretto, Android SDK) — 2026-10-07 세션 2에서 확인
+
+### F-1. AGP가 한글 경로(`C:\Project\개인용\…`)에서 빌드를 거부
+- 증상: `Your project path contains non-ASCII characters. … add 'android.overridePathCheck=true'`로 설정 단계에서 실패.
+- 원인: AGP의 경로 검사(비ASCII 경로에서 aapt2/NDK 문제가 있었던 이력 때문).
+- 해결: 저장소는 그대로 두고 **사용자 전역** `%USERPROFILE%\.gradle\gradle.properties`에 `android.overridePathCheck=true` 추가.
+  프로젝트 `gradle.properties`는 건드리지 않는다(CI는 Linux ASCII 경로라 불필요).
+- 참고: Git Bash에서 `./gradlew`를 쓰면 한글 폴더명이 경로에서 사라져 `gradle-wrapper.jar`를 못 찾는다(locale 문제).
+  Windows에서는 **PowerShell + `.\gradlew.bat`** 를 쓴다.
+
+### F-2. 단위 테스트 전부 `initializationError: ClassNotFoundException` (컴파일은 성공)
+- 증상: 테스트 클래스 이름은 나열되는데 워커 JVM이 하나도 로드하지 못함. 디버그 APK는 정상 생성.
+- 원인: Gradle이 테스트 워커의 클래스패스를 `@…\.gradle\.tmp\gradle-worker-classpath…txt` **인자 파일**로 넘긴다.
+  데몬은 이 파일을 데몬의 기본 문자셋으로 쓰는데, 프로젝트 `gradle.properties`의
+  `org.gradle.jvmargs=… -Dfile.encoding=UTF-8` 때문에 UTF-8로 써지고, Java 런처는 인자 파일을 Windows 코드페이지(CP949)로
+  읽는다 → 경로의 `개인용`이 깨져 클래스 디렉터리를 못 찾음. 워커 JVM에 `JAVA_TOOL_OPTIONS`로 UTF-8을 줘도 소용없음
+  (런처가 인자 파일을 읽는 시점은 JVM 옵션 적용 전). ASCII 정션(`mklink /J`)도 Gradle이 실제 경로로 정규화해 소용없음.
+- 해결: 사용자 전역 `%USERPROFILE%\.gradle\gradle.properties`에
+  `org.gradle.jvmargs=-Xmx3g -XX:+UseParallelGC` (file.encoding 없이)를 두어 프로젝트 값을 덮어쓴다
+  (사용자 홈 > 프로젝트 우선순위). 데몬 문자셋이 CP949가 되어 인자 파일과 런처의 인코딩이 일치한다.
+  Kotlin/javac 소스 인코딩은 AGP가 UTF-8로 고정하므로 컴파일에는 영향 없음(23개 테스트 통과로 확인).
+- 부작용: 이 설정은 이 PC의 **모든** Gradle 프로젝트 데몬에 적용된다(힙 3GB). 다른 프로젝트가 더 큰 힙을 요구하면 값을 올린다.
+- 대안: 저장소를 ASCII 경로(예: `C:\Project\lanraragi-app`)에 두면 F-1·F-2 모두 설정 없이 해결된다.
+
+### F-3. `LrrApiTest`만 `HTTP 500` — MockWebServer URL 호스트가 `display.ad.daum.net`
+- 증상: MockWebServer 기반 5개 테스트가 전부 `LrrException$HttpError: HTTP 500`, 모의 서버는 요청을 받은 기록이 없음.
+- 원인: `MockWebServer.url()`은 바인딩 주소(127.0.0.1)를 **역조회**한 `canonicalHostName`을 호스트로 쓴다. 이 PC의
+  `C:\Windows\System32\drivers\etc\hosts`에 광고 차단용 `127.0.0.1 display.ad.daum.net`이 있어 역조회 결과가 그 도메인이 됨.
+  그 호스트로 보낸 요청은 로컬의 다른 응답자(광고 차단기류)가 500으로 끊었다.
+- 해결: 테스트가 `server.url()` 대신 `"http://localhost:${server.port}"`를 쓰도록 수정(`LrrApiTest.baseUrl`).
+  OkHttp는 `localhost`의 모든 주소(127.0.0.1, ::1)를 순서대로 시도하므로 어느 쪽에 바인딩돼도 동작한다.
+- 재발 방지: 새 MockWebServer 테스트에서 `server.url()`/`server.hostName`을 쓰지 않는다.
+
+### F-4. 로컬 빌드 산출물 — Room 스키마
+- 로컬 빌드로 `app/schemas/com.sus7898.lrrviewer.data.db.AppDatabase/1.json`이 생성됨(E-3). 첫 릴리스 전에 커밋한다.

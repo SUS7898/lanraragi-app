@@ -186,6 +186,56 @@
 - **탄코본 진행률**: `PUT /api/tankoubons/{id}/progress/{page}` 지원(묶음 단위 이어 읽기).
 - **서버 "최근 읽음" 탭**: `sortby=lastread`(서버 진행률 추적 켜진 경우)로 다른 기기에서 읽은 것도 표시.
 
+## 세션 2 추가 검토 (2026-10-07, 로컬에서 코드 전수 읽기) — 기존 항목에 없는 것만
+
+**전면 개편 판단: 불필요.** 단일 모듈·수동 DI·MVVM·Room·Coil 3·타입 안전 라우트는 이 규모(4.5k줄)에 맞고, 나중에
+비싼 것(저장소 스키마·이미지 스택·라우트)은 세션 1에서 이미 교체했다. 기능이 쌓이기 **전에** 모양을 정해 둘 것은 아래 S-1·S-2 둘뿐.
+
+### S-1. 페이지 치수(width/height) 캐시 — P0-4·P1-1·P1-2가 공유하는 기반 (구조, 중)
+- 왜: 웹툰 스트립 타일링(P0-4), 양면 보기(P1-1), 웹툰 자동 감지(P1-2)가 전부 "레이아웃 전에 이미지 크기를 알아야" 한다.
+  셋을 따로 구현하면 치수 조회 코드가 세 벌 생긴다.
+- 어떻게: `data/PageInfoRepository`(Room `page_info(serverId, arcid, index, width, height)`) + Coil 디스크 캐시 스냅샷에서
+  `inJustDecodeBounds`로 읽는 단일 함수. 리더는 `List<String>`(URL) 대신 `List<Page>(url, index, size?)`를 들고 다닌다.
+  Room version 2 + AutoMigration (`app/schemas/1.json`이 커밋돼 있어야 함).
+
+### S-2. 서버 프로필은 "설정 항목이 더 늘기 전에" (P1-10 우선순위 상향 메모)
+- `AppSettings`가 `serverUrl/apiKey` 단일 서버 전제라 설정 키가 늘수록 분리 비용이 커진다. LAN/Tailscale 두 주소를 쓸 계획이
+  조금이라도 있으면 P1 중 먼저. 계획이 없으면 그대로 둔다.
+
+### S-3. 웹툰 모드 탭 존이 "항목 단위 점프" (하)
+- `ReaderScreen.onZoneTap` → `jumpEvents` → `WebtoonReader`의 `scrollToItem(p)`. 긴 스트립에서는 한 탭에 화면 몇 개분이 튄다.
+- 수정: 웹툰 모드에서는 `listState.animateScrollBy(±viewportHeight * 0.9f)`. 볼륨키도 동일.
+
+### S-4. 웹툰 줌이 `graphicsLayer` 스케일이라 레이아웃과 분리 (P0-4와 함께, 중)
+- 확대 상태에서 탭 좌표·스크롤 범위가 실제 콘텐츠와 어긋난다. 타일링 재설계 때 `Modifier.zoomable`(telephoto) 또는
+  항목 폭을 실제로 키우는 방식으로 바꾼다.
+
+### S-5. 자동 업데이트 확인 실패(오프라인)도 "오늘 확인함"으로 기록 (하, 버그)
+- `AppRoot.AutoUpdateCheck`가 `check()` 결과와 무관하게 `lastUpdateCheck = now`. 성공 시에만 갱신하도록.
+
+### S-6. 서재 무한 스크롤 오프셋 (하, 잠재 버그)
+- `LibraryViewModel.loadMore`가 `start = items.size`인데 `distinctBy { arcid }`로 중복이 빠지면 서버 오프셋과 어긋나 항목이 누락될 수 있다.
+  서버 페이지 오프셋을 별도 필드로 추적.
+
+### S-7. 미리 받기가 현재 페이지와 같은 OkHttp 디스패처를 공유 (중)
+- 느린 NAS/외부망에서 prefetch 3장이 현재 페이지 요청을 늦출 수 있다. 현재 페이지 요청을 먼저 보내고(prefetch는 성공 콜백 뒤),
+  또는 `Dispatcher.maxRequestsPerHost`를 2~3으로 제한.
+
+### S-8. 썸네일과 페이지가 디스크 캐시를 공유 (하~중)
+- 512MB 캐시를 페이지가 채우면 썸네일이 밀려 서재 스크롤이 매번 재다운로드. 썸네일 전용 소형 `ImageLoader`(64MB) 분리.
+
+### S-9. 펀치홀/컷아웃 몰입 모드 (하)
+- 리더에서 `window.attributes.layoutInDisplayCutoutMode = SHORT_EDGES`가 없으면 Galaxy 가로 모드에서 컷아웃 쪽에 검은 띠.
+
+### S-10. 정렬 옵션 확장 (하)
+- LANraragi `sortby`는 임의 네임스페이스를 받는다(`artist`, `series`, `date_added`…). `SearchQuery.SORT_OPTIONS`에 artist/series 추가.
+
+### S-11. 콜드 스타트: 설정 읽기 + Keystore 복호화를 `runBlocking`으로 메인 스레드에서 (하~중)
+- `AppGraph.settingsState` 초기값. 체감되면 스플래시 동안 비동기 로드로 바꾼다. 캐시 크기 설정도 재시작 전까지 미적용(같은 지점).
+
+### S-12. 서재 카드 길게 누르기 → 빠른 동작 메뉴 (하~중)
+- NEW 토글, 카테고리에 추가(P1-6과 연동), 기록 삭제. 상세 화면 왕복을 줄인다.
+
 ## 구조 개편으로 처리된 것 (세션 1 후반)
 - [x] 기록 저장소 Room 전환 + `(serverId, arcid)` 식별자 — P1-10/P1-2/북마크 등의 기반
 - [x] Coil 3 이전(`coil3-compose`, `coil-network-okhttp`, telephoto coil3)
