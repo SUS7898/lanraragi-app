@@ -61,6 +61,17 @@
 - 확인한 입력: setup-android v3 `packages`, `accept-android-sdk-licenses`; mobsfscan CLI `--sarif --json -o`;
   softprops/action-gh-release v2 `make_latest`, `generate_release_notes`, `fail_on_unmatched_files`.
 
+### C-3. Trivy 게이트 실패: `io.netty:*` CRITICAL/HIGH (커밋 96b5e8a)
+- 증상: Security Scan의 Trivy 작업이 `io.netty:netty-handler 4.1.110.Final` 등 CRITICAL/HIGH로 실패. CI 자체는 성공.
+- 원인: `lockAllConfigurations()` + 모든 resolvable 구성을 resolve → `gradle.lockfile`에 AGP/Gradle **빌드 도구**
+  의존성(netty, protobuf, grpc…)까지 기록됨. 이것들은 APK에 포함되지 않는데 Trivy는 구분하지 못함.
+- 해결: 잠금 태스크를 `lockReleaseDependencies`로 바꿔 `releaseRuntimeClasspath`/`releaseCompileClasspath`만 resolve.
+  → lockfile = 실제 배포되는 의존성 그래프. 빌드 도구(AGP) 취약점은 Dependabot의 AGP 업데이트 PR로 관리.
+- 재발 방지: 새 구성(configuration)을 스캔 대상에 넣을 때는 "기기에 올라가는 것인지" 먼저 확인.
+
+### C-4. 두 번째 CI 실행 (커밋 96b5e8a): 성공
+- Unit tests · Android Lint(debug) · assembleDebug 모두 통과. Security Scan: CodeQL·Android Lint(release)·gitleaks·mobsfscan 통과, Trivy만 C-3로 실패.
+
 ## D. 라이브러리 API 함정 (컴파일 전 확인한 가정)
 - **minSdk는 28**: 업데이트 검증에 쓰는 `PackageInfo.signingInfo`, `longVersionCode`, `GET_SIGNING_CERTIFICATES`가
   API 28. minSdk 26이면 Lint `NewApi` 오류로 CI 실패. (Galaxy 2018년 이후 기기 모두 해당)

@@ -143,22 +143,26 @@ kotlin {
     }
 }
 
-// Dependency locking lets the security workflow write app/gradle.lockfile so that
-// Trivy can scan the exact dependency graph (see .github/workflows/security.yml).
+// Dependency locking lets the security workflow write app/gradle.lockfile so that Trivy can
+// scan the exact dependency graph that ships in the APK (see .github/workflows/security.yml).
+// Only the release classpaths are resolved on purpose: locking every configuration would also
+// list Gradle/AGP build tooling (protobuf, netty, ...) that never ends up on the device and
+// produces false-positive vulnerability findings.
 dependencyLocking {
     lockAllConfigurations()
 }
 
-tasks.register("resolveAndLockAll") {
-    description = "Resolves every resolvable configuration; run with --write-locks to produce gradle.lockfile."
+tasks.register("lockReleaseDependencies") {
+    description = "Resolves the release classpaths; run with --write-locks to produce gradle.lockfile for vulnerability scanning."
     notCompatibleWithConfigurationCache("Resolves configurations at execution time")
     doFirst {
         require(gradle.startParameter.isWriteDependencyLocks) { "$path must be run with --write-locks" }
     }
     doLast {
-        configurations.filter { it.isCanBeResolved }.forEach { cfg ->
-            runCatching { cfg.resolve() }
-                .onFailure { logger.info("resolveAndLockAll: skipping ${cfg.name} (${it.message})") }
+        val shipped = setOf("releaseRuntimeClasspath", "releaseCompileClasspath")
+        configurations.filter { it.name in shipped }.forEach { cfg ->
+            cfg.resolve()
+            logger.lifecycle("lockReleaseDependencies: resolved ${cfg.name} (${cfg.resolvedConfiguration.resolvedArtifacts.size} artifacts)")
         }
     }
 }

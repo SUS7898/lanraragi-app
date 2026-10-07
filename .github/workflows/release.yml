@@ -74,7 +74,7 @@ jobs:
         run: ./gradlew --no-daemon --stacktrace :app:testReleaseUnitTest
 
       - name: Vulnerability scan (Trivy, blocks on CRITICAL/HIGH with a fix)
-        run: ./gradlew --no-daemon :app:resolveAndLockAll --write-locks --no-configuration-cache
+        run: ./gradlew --no-daemon :app:lockReleaseDependencies --write-locks --no-configuration-cache
       - uses: aquasecurity/trivy-action@v0.36.0
         with:
           scan-type: fs

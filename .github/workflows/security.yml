@@ -75,7 +75,7 @@ jobs:
           accept-android-sdk-licenses: true
       - uses: gradle/actions/setup-gradle@v4
       - name: Write gradle.lockfile for the scanner
-        run: ./gradlew --no-daemon :app:resolveAndLockAll --write-locks --no-configuration-cache && ls -la app/gradle.lockfile
+        run: ./gradlew --no-daemon :app:lockReleaseDependencies --write-locks --no-configuration-cache && ls -la app/gradle.lockfile
       - name: Trivy (SARIF, all severities)
         uses: aquasecurity/trivy-action@v0.36.0
         with:
