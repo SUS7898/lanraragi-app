@@ -1,6 +1,6 @@
 # 진행 상황 (PROGRESS)
 
-마지막 갱신: 2026-10-07 (세션 1)
+마지막 갱신: 2026-10-07 (세션 1) — 코드 완성, CI/보안 스캔 녹색. 다음은 사용자 작업(키스토어·Secrets) 후 첫 릴리스.
 
 ## 상태 요약
 - [x] 요구사항 분석, Mihon 오류 원인 확인, LANraragi API 소스 확인
@@ -13,7 +13,7 @@
 - [x] GitHub Actions: CI / Release(서명+체크섬+Trivy 게이트) / Security(CodeQL·Trivy·gitleaks·Lint·mobsfscan)
 - [x] 문서: CLAUDE.md, DESIGN, TROUBLESHOOTING, PROGRESS, README, SECURITY
 - [x] CI에서 컴파일·테스트·린트 통과 확인 (run 37568970519)
-- [ ] Security Scan 전 작업 통과 확인 (Trivy 범위 수정 후 재실행 대기)
+- [x] Security Scan 전 작업 통과 확인 (run 37569641741: CodeQL·Trivy·gitleaks·Lint·mobsfscan ✅)
 - [ ] 사용자: 키스토어 생성 + GitHub Secrets 등록 (`scripts/generate-keystore.sh`, README §릴리스)
 - [ ] 첫 태그 `v0.1.0` 릴리스 → 실기기 설치 테스트(Galaxy 폰/태블릿)
 - [ ] 실기기 피드백 반영 (제스처 감도, 웹툰 모드 줌, 탭존 비율 등)
@@ -29,3 +29,4 @@
 | 2026-10-07 | 초기 코드 작성 (로컬 빌드 불가) | CI 대기 |
 | 2026-10-07 | CI run 37568970519 (커밋 96b5e8a) | ✅ 테스트·린트·디버그 APK 성공 |
 | 2026-10-07 | Security Scan run 37568970490 | CodeQL/Lint/gitleaks/mobsfscan ✅, Trivy ❌(빌드 도구 netty 오탐 → C-3로 수정) |
+| 2026-10-07 | CI run 37569641719 + Security Scan run 37569641741 (커밋 a4412e2) | ✅ 전부 성공 |

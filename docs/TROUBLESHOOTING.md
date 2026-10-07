@@ -72,6 +72,9 @@
 ### C-4. 두 번째 CI 실행 (커밋 96b5e8a): 성공
 - Unit tests · Android Lint(debug) · assembleDebug 모두 통과. Security Scan: CodeQL·Android Lint(release)·gitleaks·mobsfscan 통과, Trivy만 C-3로 실패.
 
+### C-5. 세 번째 실행 (커밋 a4412e2): CI·Security Scan 전부 성공
+- Trivy 범위를 배포 의존성으로 좁힌 뒤 게이트 통과. 이 시점의 상태가 "릴리스 가능" 기준선.
+
 ## D. 라이브러리 API 함정 (컴파일 전 확인한 가정)
 - **minSdk는 28**: 업데이트 검증에 쓰는 `PackageInfo.signingInfo`, `longVersionCode`, `GET_SIGNING_CERTIFICATES`가
   API 28. minSdk 26이면 Lint `NewApi` 오류로 CI 실패. (Galaxy 2018년 이후 기기 모두 해당)
