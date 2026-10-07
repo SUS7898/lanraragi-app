@@ -113,6 +113,15 @@
 - 추가(구조 개편 후 16 warnings): `DataExtractionRules`가 "minSdk 28이면 `fullBackupContent`도 지정" → `xml/backup_rules.xml` 추가.
   남은 경고는 전부 의도된 것(버전 핀, OldTargetApi, enableOnBackInvokedCallback).
 
+### C-10. 첫 Release 실행 (v0.1.0): `Verify APK signature` 단계 실패 — "v2 scheme: false"
+- 증상: 서명 빌드까지 성공했는데 `apksigner verify --verbose` 결과가 `v2: false, v3: true`라 워크플로의 v2 `true` grep에서 실패.
+- 원인: apksigner는 APK의 minSdk(28)부터 검증하는데, v3 서명이 있으면 API 28 이상 전 구간이 v3로 검증되므로 **v2는 검사하지
+  않고 false로 출력**한다(v2는 API 24~27에서만 필요). `enableV2Signing = true`로 v2 블록은 들어 있지만 결과에는 드러나지 않는다.
+- 해결: 워크플로 검증을 v3 `true`만 요구하도록 수정. minSdk를 24 이하로 낮추면 그때 v2 검사를 되살린다.
+- 참고: 그 전 실행(37617782057)은 Secrets 4개 중 비밀번호 2개가 미등록이라 `Check signing secrets`에서 멈춤 — `gh secret list`로 4개 확인.
+- 수동 재실행(`workflow_dispatch`)은 **기본 브랜치의 워크플로 파일**이 있어야 등록된다. `main`이 초기 커밋뿐이라 422가 났고,
+  작업 브랜치를 `main`으로 fast-forward한 뒤에야 `gh workflow run Release -f tag=v0.1.0`이 가능해졌다(Security Scan 주간 예약도 동일).
+
 ## E. 구조 개편(세션 1 후반) 시 확인한 사항 — Room · Coil 3 · 타입 안전 내비게이션
 
 ### E-1. 왜 "전면 개편"이 아니라 "선택적 조기 교체"인가 (결정 기록)

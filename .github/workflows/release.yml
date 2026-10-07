@@ -111,7 +111,8 @@ jobs:
           test -f "$APK"
           BT="$ANDROID_HOME/build-tools/35.0.0"
           "$BT/apksigner" verify --verbose --print-certs "$APK" | tee apksigner.txt
-          grep -q "Verified using v2 scheme (APK Signature Scheme v2): true" apksigner.txt
+          # minSdk is 28, so apksigner only verifies the v3 block (v2 is checked just for API < 28) and
+          # prints "v2: false" even though the v2 block is present. Require v3; see docs/TROUBLESHOOTING.md C-10.
           grep -q "Verified using v3 scheme (APK Signature Scheme v3): true" apksigner.txt
           "$BT/aapt2" dump badging "$APK" | grep -E "^package:" | tee badging.txt
           grep -q "name='com.sus7898.lrrviewer'" badging.txt
