@@ -50,8 +50,16 @@
 
 ## C. 빌드 / CI
 
-### C-1. (예정) CI 첫 실행 결과는 여기에 기록
-- 첫 push 후 CI 로그에서 나온 컴파일 오류와 수정 내용을 항목별로 추가할 것.
+### C-1. 첫 CI 실행 (커밋 40fdd7a, 2026-10-07)
+- `Unit tests` 단계 성공 = 메인/테스트 Kotlin 컴파일 통과, 테스트 전부 통과. (이후 단계는 두 번째 push로 취소됨)
+- 사전 리뷰에서 고친 것: minSdk 28(NewApi), okio `request(Long)`, 컴포저블 슬롯 추론 → 커밋 cb1faa5.
+
+### C-2. `aquasecurity/trivy-action` 태그는 `v` 접두사 (`@v0.36.0`), `skip-setup-trivy` 입력은 v0.29.0+
+- `0.28.0`(v 없음)은 raw.githubusercontent.com에서 404, `v0.28.0`은 존재. 0.28.0에는 `skip-setup-trivy` 입력이 없어
+  경고 발생 → `v0.36.0`으로 고정(2026-10 기준 확인된 최신 태그). 액션 입력 이름은 각 저장소의 `action.yml`을
+  raw로 받아 확인할 수 있다(API는 세션 범위 밖이라 차단).
+- 확인한 입력: setup-android v3 `packages`, `accept-android-sdk-licenses`; mobsfscan CLI `--sarif --json -o`;
+  softprops/action-gh-release v2 `make_latest`, `generate_release_notes`, `fail_on_unmatched_files`.
 
 ## D. 라이브러리 API 함정 (컴파일 전 확인한 가정)
 - **minSdk는 28**: 업데이트 검증에 쓰는 `PackageInfo.signingInfo`, `longVersionCode`, `GET_SIGNING_CERTIFICATES`가
