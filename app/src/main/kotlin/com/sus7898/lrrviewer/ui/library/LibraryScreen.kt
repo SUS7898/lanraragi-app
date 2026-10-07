@@ -102,7 +102,7 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
                 modifier = Modifier.weight(1f),
             ) {
                 when {
-                    state.loading && state.items.isEmpty() -> LoadingView("서재를 불러오는 중…")
+                    state.loading && state.items.isEmpty() -> LoadingView(message = "서재를 불러오는 중…")
                     state.items.isEmpty() && state.error != null -> ErrorView(state.error!!, onRetry = { vm.refresh() })
                     state.items.isEmpty() -> EmptyView("결과가 없습니다")
                     else -> LazyVerticalGrid(

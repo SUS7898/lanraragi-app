@@ -1,6 +1,6 @@
 package com.sus7898.lrrviewer.ui.reader
 
-import android.graphics.drawable.ColorDrawable
+import androidx.core.graphics.drawable.toDrawable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import coil.ImageLoader
@@ -174,7 +174,7 @@ class ReaderViewModel(
 
 /** A decoder that decodes nothing: the fetcher has already written the bytes to the disk cache. */
 private object DiskOnlyDecoder : Decoder {
-    override suspend fun decode(): DecodeResult = DecodeResult(ColorDrawable(android.graphics.Color.TRANSPARENT), false)
+    override suspend fun decode(): DecodeResult = DecodeResult(android.graphics.Color.TRANSPARENT.toDrawable(), false)
 
     object Factory : Decoder.Factory {
         override fun create(result: SourceResult, options: Options, imageLoader: ImageLoader): Decoder {

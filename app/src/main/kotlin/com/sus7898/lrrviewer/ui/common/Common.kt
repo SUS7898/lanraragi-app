@@ -4,7 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.Intent
-import android.net.Uri
+import androidx.core.net.toUri
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -27,7 +27,7 @@ import java.util.Locale
 // ---------------------------------------------------------------------------- views
 
 @Composable
-fun LoadingView(message: String? = null, modifier: Modifier = Modifier) {
+fun LoadingView(modifier: Modifier = Modifier, message: String? = null) {
     Column(
         modifier = modifier.fillMaxSize(),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -178,7 +178,7 @@ tailrec fun Context.findActivity(): Activity? = when (this) {
 }
 
 fun Context.openUrl(url: String): Boolean = runCatching {
-    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    startActivity(Intent(Intent.ACTION_VIEW, url.toUri()).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
 }.isSuccess
 
 /** Increments every time the hosting lifecycle resumes; use as a key to re-evaluate system state. */

@@ -5,8 +5,11 @@
   (see LrrAuthInterceptor). User-installed CA certificates are trusted so that a NAS with a
   self-signed HTTPS certificate works once its CA is installed on the device.
 -->
-<network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+<network-security-config xmlns:tools="http://schemas.android.com/tools">
+    <!-- Accepted risks (see SECURITY.md): LAN NAS over plain HTTP, self-signed HTTPS via user-installed CA. -->
+    <base-config
+        cleartextTrafficPermitted="true"
+        tools:ignore="InsecureBaseConfiguration,AcceptsUserCertificates">
         <trust-anchors>
             <certificates src="system" />
             <certificates src="user" />

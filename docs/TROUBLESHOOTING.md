@@ -103,6 +103,14 @@
   `python3 -m venv v && v/bin/pip install mobsfscan && v/bin/mobsfscan -c .mobsf --json -o out.json app/src/main`
   (pypi는 세션에서 접근 가능 → **mobsfscan은 로컬에서 돌릴 수 있는 유일한 검사기**).
 
+### C-9. Android Lint(release) 결과: 0 errors / 19 warnings (run 37571175711) 와 정리
+- 고친 것: `ObsoleteSdkInt`(mipmap-anydpi-v26 → mipmap-anydpi), `DataExtractionRules`(`data_extraction_rules.xml` 추가),
+  `ModifierParameter`(LoadingView 파라미터 순서), `UseKtx`(`toUri()`, `toDrawable()`).
+- 의도적으로 둔 것: `InsecureBaseConfiguration`/`AcceptsUserCertificates`(수용 위험, XML에 `tools:ignore` + 주석),
+  `GradleDependency`/`AndroidGradlePluginVersion`(버전 핀 정책, Dependabot PR로 관리), `OldTargetApi`(compileSdk 35 핀),
+  `UnusedAttribute enableOnBackInvokedCallback`(API 33+에서만 의미, 무해).
+- Lint 결과는 이제 작업 로그에 텍스트로 출력된다(`textOutput = File("stdout")`).
+
 ## D. 라이브러리 API 함정 (컴파일 전 확인한 가정)
 - **minSdk는 28**: 업데이트 검증에 쓰는 `PackageInfo.signingInfo`, `longVersionCode`, `GET_SIGNING_CERTIFICATES`가
   API 28. minSdk 26이면 Lint `NewApi` 오류로 CI 실패. (Galaxy 2018년 이후 기기 모두 해당)
