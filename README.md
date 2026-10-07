@@ -10,7 +10,8 @@ NAS에서 컨테이너로 실행 중인 [LANraragi](https://github.com/Difegue/L
 - CI에서 CodeQL / Trivy / gitleaks / Android Lint / mobsfscan 보안 점검.
 
 > 개발 메모·설계·트러블슈팅은 [`CLAUDE.md`](CLAUDE.md), [`docs/DESIGN.md`](docs/DESIGN.md),
-> [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md), [`docs/PROGRESS.md`](docs/PROGRESS.md) 참고.
+> [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md), [`docs/PROGRESS.md`](docs/PROGRESS.md),
+> 앞으로 할 일은 [`docs/BACKLOG.md`](docs/BACKLOG.md), 실기기 테스트는 [`docs/TEST_CHECKLIST.md`](docs/TEST_CHECKLIST.md) 참고.
 
 ## 기능
 
@@ -28,6 +29,8 @@ NAS에서 컨테이너로 실행 중인 [LANraragi](https://github.com/Difegue/L
 1. [Releases](../../releases/latest)에서 `lrr-viewer-vX.Y.Z.apk`를 폰/태블릿에 내려받아 엽니다.
 2. "출처를 알 수 없는 앱 설치" 허용 안내가 나오면 **내려받은 앱(브라우저/파일 앱)** 에 대해 1회 허용합니다.
    Play Protect가 "알 수 없는 개발자" 경고를 띄울 수 있습니다. Play 미배포 앱의 정상 동작이며 서명으로 없앨 수 없습니다.
+   Galaxy(One UI 6 이상)에서 **자동 차단(Auto Blocker)** 이 켜져 있으면 설치와 앱 내 업데이트가 막힐 수 있습니다.
+   설정 → 보안 및 개인정보 보호 → 자동 차단을 잠시 끄거나 예외를 허용하세요.
 3. 앱을 열고 NAS의 LANraragi 주소(예: `http://192.168.0.10:3000`)와 필요 시 API 키(서버 설정 → Security)를 입력, **연결 테스트** 후 저장.
 
 이후 업데이트는 **앱 → 설정 → 업데이트**에서 진행합니다. 첫 자체 업데이트 때 "이 앱이 알 수 없는 앱을 설치하도록 허용"을

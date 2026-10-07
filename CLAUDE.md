@@ -7,10 +7,13 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
 1. `docs/PROGRESS.md` — 현재 상태, 완료/미완료 항목, 다음 할 일
 2. `docs/TROUBLESHOOTING.md` — 이미 겪은 문제와 해결책 (같은 오류 반복 금지)
 3. `docs/DESIGN.md` — 아키텍처, 결정 사항과 이유, LANraragi API 메모
+4. `docs/BACKLOG.md` — 검토 완료된 개선 항목(우선순위·설계 힌트 포함). 새 기능은 여기서 골라 시작
+5. `docs/TEST_CHECKLIST.md` — 실기기 수동 테스트 절차(릴리스 빌드로)
 
 ## 절대 규칙
 - 문제를 해결하면 **같은 커밋에서** `docs/TROUBLESHOOTING.md`에 증상/원인/해결을 추가한다.
 - 설계를 바꾸면 `docs/DESIGN.md`를 갱신한다. 단계가 끝나면 `docs/PROGRESS.md`를 갱신한다.
+- 백로그 항목을 구현하면 `docs/BACKLOG.md`에서 체크하고, 새 아이디어는 구현 대신 백로그에 먼저 적는다.
 - 서명 키(`*.jks`, `keystore.properties`)는 절대 커밋하지 않는다 (`.gitignore` 참조).
 - 커밋 메시지·코드 주석에 모델 식별자를 넣지 않는다.
 - 숫자/불리언 JSON 필드는 반드시 `LenientXxxSerializer`로 파싱한다 (Mihon 확장이 깨진 원인).

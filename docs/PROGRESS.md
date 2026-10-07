@@ -19,9 +19,11 @@
 - [ ] 실기기 피드백 반영 (제스처 감도, 웹툰 모드 줌, 탭존 비율 등)
 
 ## 다음 세션이 할 일 (우선순위)
-1. `CI` 워크플로 상태 확인. 실패 시 로그 → 수정 → push. 결과를 TROUBLESHOOTING §C에 기록.
-2. 사용자가 secrets를 넣었는지 확인 후 `v0.1.0` 태그로 `Release` 워크플로 실행.
-3. 실기기 테스트 결과를 받아 버그 수정, PROGRESS 갱신.
+1. 사용자가 키스토어·secrets를 넣었는지 확인 후 `v0.1.0` 태그로 `Release` 워크플로 실행.
+2. `docs/TEST_CHECKLIST.md`로 실기기 테스트(릴리스 빌드) → 실패 항목 수정 → TROUBLESHOOTING 기록.
+3. `docs/BACKLOG.md` P0 항목(Galaxy 자동 차단 안내, 웹툰 스트립 처리)부터 착수. 그 다음 P1.
+
+- [x] 개선 백로그 검토·정리 (`docs/BACKLOG.md`), 실기기 테스트 체크리스트 (`docs/TEST_CHECKLIST.md`)
 
 ## 검증 이력
 | 날짜 | 무엇을 | 결과 |
