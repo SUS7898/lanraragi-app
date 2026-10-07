@@ -24,7 +24,7 @@
 - `scripts/generate-keystore.sh` → Secrets 4개 → `git tag v0.1.0 && git push origin v0.1.0`.
 - 키스토어 백업을 2곳 이상에(비밀번호 관리자 + 오프라인). 분실 시 기존 설치본 위 업데이트 불가.
 
-### P0-3. Galaxy "자동 차단(Auto Blocker)" 안내 추가 (README)
+### ✅ P0-3. Galaxy "자동 차단(Auto Blocker)" 안내 추가 (README) — v0.1.1: `STATUS_FAILURE_BLOCKED` 메시지 구현
 - 왜: One UI 6 이상 Galaxy는 **자동 차단**이 켜져 있으면 Play/Galaxy 스토어 외 설치가 막힌다. 첫 설치뿐 아니라
   **앱 내 자체 업데이트(PackageInstaller)도 차단**될 수 있다.
 - 어떻게: README 설치 절차에 "설정 → 보안 및 개인정보 보호 → 자동 차단 끄기(또는 설치 후 다시 켜기)" 추가.
@@ -85,7 +85,7 @@
   생성 요청 후 minion 폴링). 바텀바 "격자" 버튼 → `ModalBottomSheet`에 `LazyVerticalGrid`.
 - 난이도: 중. 서버 버전에 따라 page 썸네일 미지원일 수 있으니 실패 시 숨김.
 
-### P1-6. 북마크 / 카테고리에 추가
+### ◐ P1-6. 북마크 / 카테고리에 추가 — v0.1.1: 북마크(즐겨찾기) 토글·필터 구현, "카테고리에 추가…" 메뉴는 미구현
 - 왜: 서버의 카테고리(정적)로 "나중에 읽기"를 관리할 수 있다. 최신 LRR에는 **북마크 전용 카테고리 링크**가 있다.
 - 어떻게: `GET /api/categories/bookmark_link` → 북마크 카테고리 ID. 상세 화면에 북마크 토글 버튼:
   `PUT /api/categories/{catId}/{arcid}` / `DELETE /api/categories/{catId}/{arcid}`. "카테고리에 추가…" 메뉴에
@@ -105,7 +105,7 @@
   "N개 항목은 서버 응답 형식 문제로 건너뜀" 칩 표시(원래 문제의 가시화).
 - 난이도: 하.
 
-### P1-9. 키보드/마우스(DeX, 블루투스 키보드) 지원
+### ✅ P1-9. 키보드/마우스(DeX, 블루투스 키보드) 지원 — v0.1.1: 방향키·Page Up/Down·Space
 - 어떻게: `MainActivity.onKeyDown`에 `KEYCODE_DPAD_LEFT/RIGHT`, `PAGE_UP/DOWN`, `SPACE`를 `ReaderKeyEvents`로 라우팅.
   마우스 휠은 Compose 기본 스크롤로 웹툰 모드에서 이미 동작.
 - 난이도: 하.
@@ -148,7 +148,7 @@
   SHA-256 + 서명 인증서 일치를 검사하므로 필수는 아님.
 - 난이도: 하~중.
 
-### P2-4. 진단 로그 · 크래시 로그(외부 전송 없음)
+### ◐ P2-4. 진단 로그 · 크래시 로그(외부 전송 없음) — v0.1.1: 크래시 로그 구현(설정 → 정보), API 오류 링 버퍼는 미구현
 - 왜: 실기기에서 문제가 나면 logcat 없이도 원인을 볼 수 있어야 세션 간 디버깅이 빠르다.
 - 어떻게: `Thread.setDefaultUncaughtExceptionHandler`로 스택을 `files/crash/`에 저장, 다음 실행 때 설정에
   "최근 크래시 보기/공유". API 오류·파싱 건너뜀을 링 버퍼(최근 200건)로 메모리에 보관하고 "진단 로그 공유"
@@ -202,7 +202,7 @@
 - `AppSettings`가 `serverUrl/apiKey` 단일 서버 전제라 설정 키가 늘수록 분리 비용이 커진다. LAN/Tailscale 두 주소를 쓸 계획이
   조금이라도 있으면 P1 중 먼저. 계획이 없으면 그대로 둔다.
 
-### S-3. 웹툰 모드 탭 존이 "항목 단위 점프" (하)
+### ✅ S-3. 웹툰 모드 탭 존이 "항목 단위 점프" (하) — v0.1.1
 - `ReaderScreen.onZoneTap` → `jumpEvents` → `WebtoonReader`의 `scrollToItem(p)`. 긴 스트립에서는 한 탭에 화면 몇 개분이 튄다.
 - 수정: 웹툰 모드에서는 `listState.animateScrollBy(±viewportHeight * 0.9f)`. 볼륨키도 동일.
 
@@ -210,10 +210,10 @@
 - 확대 상태에서 탭 좌표·스크롤 범위가 실제 콘텐츠와 어긋난다. 타일링 재설계 때 `Modifier.zoomable`(telephoto) 또는
   항목 폭을 실제로 키우는 방식으로 바꾼다.
 
-### S-5. 자동 업데이트 확인 실패(오프라인)도 "오늘 확인함"으로 기록 (하, 버그)
+### ✅ S-5. 자동 업데이트 확인 실패(오프라인)도 "오늘 확인함"으로 기록 (하, 버그) — v0.1.1
 - `AppRoot.AutoUpdateCheck`가 `check()` 결과와 무관하게 `lastUpdateCheck = now`. 성공 시에만 갱신하도록.
 
-### S-6. 서재 무한 스크롤 오프셋 (하, 잠재 버그)
+### ✅ S-6. 서재 무한 스크롤 오프셋 (하, 잠재 버그) — v0.1.1 (`LibraryViewModelTest`)
 - `LibraryViewModel.loadMore`가 `start = items.size`인데 `distinctBy { arcid }`로 중복이 빠지면 서버 오프셋과 어긋나 항목이 누락될 수 있다.
   서버 페이지 오프셋을 별도 필드로 추적.
 
@@ -224,10 +224,10 @@
 ### S-8. 썸네일과 페이지가 디스크 캐시를 공유 (하~중)
 - 512MB 캐시를 페이지가 채우면 썸네일이 밀려 서재 스크롤이 매번 재다운로드. 썸네일 전용 소형 `ImageLoader`(64MB) 분리.
 
-### S-9. 펀치홀/컷아웃 몰입 모드 (하)
+### ✅ S-9. 펀치홀/컷아웃 몰입 모드 (하) — v0.1.1
 - 리더에서 `window.attributes.layoutInDisplayCutoutMode = SHORT_EDGES`가 없으면 Galaxy 가로 모드에서 컷아웃 쪽에 검은 띠.
 
-### S-10. 정렬 옵션 확장 (하)
+### ✅ S-10. 정렬 옵션 확장 (하) — v0.1.1: 평점/작가/시리즈/그룹 + 임의 네임스페이스
 - LANraragi `sortby`는 임의 네임스페이스를 받는다(`artist`, `series`, `date_added`…). `SearchQuery.SORT_OPTIONS`에 artist/series 추가.
 
 ### S-11. 콜드 스타트: 설정 읽기 + Keystore 복호화를 `runBlocking`으로 메인 스레드에서 (하~중)
@@ -235,6 +235,13 @@
 
 ### S-12. 서재 카드 길게 누르기 → 빠른 동작 메뉴 (하~중)
 - NEW 토글, 카테고리에 추가(P1-6과 연동), 기록 삭제. 상세 화면 왕복을 줄인다.
+
+## 세션 2 실기기 피드백으로 추가된 것 (2026-10-07, v0.1.1)
+- ✅ 탭 존이 화면이 아닌 **표시된 이미지** 기준(가로 모드 태블릿에서 "이미지 중앙이 아닌데 메뉴가 뜸" 해결). 탭 좌우 30%.
+- ✅ 검색 후 뒤로 가기가 앱을 바로 종료 → 필터 초기화 → 탭 복귀 → 종료 순서.
+- ✅ 카테고리 이름순(📌 먼저, 자연수 정렬) 기본 + 서버 순서 + 드래그 수동 순서(설정 → 서재).
+- ✅ 평점(별 5개, 서버 태그 `rating:N`) + "N점 이상" 필터 + 평점 정렬. ✅ 즐겨찾기(서버 북마크 카테고리) + 필터 칩.
+- 남은 아이디어: 카드 길게 눌러 즐겨찾기/평점 바로 바꾸기(S-12와 합침), 평점 반 별(0.5) 지원, 즐겨찾기 카테고리 이름 설정.
 
 ## 구조 개편으로 처리된 것 (세션 1 후반)
 - [x] 기록 저장소 Room 전환 + `(serverId, arcid)` 식별자 — P1-10/P1-2/북마크 등의 기반

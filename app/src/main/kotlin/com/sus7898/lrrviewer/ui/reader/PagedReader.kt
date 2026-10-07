@@ -27,6 +27,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -74,7 +75,9 @@ fun PagedReader(
         ReaderPage(
             url = pages[index],
             contentScale = contentScale,
-            onTap = { offset, size -> onTap(zoneOf(offset, size, vertical = mode == ReadingMode.VERTICAL)) },
+            onTap = { offset, size, imageBounds ->
+                onTap(zoneOf(offset, size, vertical = mode == ReadingMode.VERTICAL, contentBounds = imageBounds))
+            },
         )
     }
 
@@ -96,8 +99,9 @@ fun PagedReader(
     }
 }
 
+/** [onTap] receives the tap position, the viewport size and the displayed image bounds (viewport coordinates). */
 @Composable
-private fun ReaderPage(url: String, contentScale: ContentScale, onTap: (Offset, IntSize) -> Unit) {
+private fun ReaderPage(url: String, contentScale: ContentScale, onTap: (Offset, IntSize, Rect) -> Unit) {
     val context = LocalContext.current
     var retry by remember(url) { mutableIntStateOf(0) }
     var error by remember(url) { mutableStateOf<String?>(null) }
@@ -131,7 +135,7 @@ private fun ReaderPage(url: String, contentScale: ContentScale, onTap: (Offset, 
             modifier = Modifier.fillMaxSize(),
             state = imageState,
             contentScale = contentScale,
-            onClick = { offset -> onTap(offset, size) },
+            onClick = { offset -> onTap(offset, size, zoomableState.transformedContentBounds) },
         )
         if (!imageState.isImageDisplayed && error == null) {
             CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)

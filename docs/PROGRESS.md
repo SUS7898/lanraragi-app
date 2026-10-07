@@ -1,6 +1,6 @@
 # 진행 상황 (PROGRESS)
 
-마지막 갱신: 2026-10-07 (세션 2, 로컬 PC) — 로컬 clone·빌드 환경 구성 완료(23개 테스트 통과, 디버그 APK). 다음은 사용자 작업(키스토어·Secrets) → 첫 릴리스 → 실기기 테스트.
+마지막 갱신: 2026-10-07 (세션 2, 로컬 PC) — v0.1.0 릴리스 게시, 실기기 1차 피드백 반영(v0.1.1: 탭 존·뒤로 가기·카테고리 정렬/순서·평점·즐겨찾기 등). 다음은 v0.1.1 앱 내 업데이트 실측 → 체크리스트 §9b.
 
 ## 상태 요약
 - [x] 요구사항 분석, Mihon 오류 원인 확인, LANraragi API 소스 확인
@@ -16,11 +16,15 @@
 - [x] Security Scan 전 작업 통과 확인 (run 37569641741: CodeQL·Trivy·gitleaks·Lint·mobsfscan ✅)
 - [x] 로컬 PC(Windows) 빌드 환경 구성: 한글 경로·인자 파일 인코딩·hosts 역조회 문제 해결(TROUBLESHOOTING §F), `app/schemas/…/1.json` 생성
 - [x] 사용자: 키스토어 생성 + GitHub Secrets 등록 (2026-10-07)
-- [x] 첫 태그 `v0.1.0` 릴리스 게시 (Release run 37619492446) → [ ] 실기기 설치 테스트(Galaxy 폰/태블릿)
+- [x] 첫 태그 `v0.1.0` 릴리스 게시 (Release run 37619492446) → [x] 실기기 설치·연결·열람 확인(사용자), 피드백 4건
+- [x] v0.1.1: 탭 존(이미지 기준)·뒤로 가기 계층·카테고리 정렬/드래그 순서·정렬 옵션 확장·평점(`rating:N`)·즐겨찾기(북마크)·
+      크래시 로그·키보드 키·컷아웃·자동 차단 안내·업데이트 체크/오프셋 버그 수정 — 단위 테스트 39개, Lint 0 errors(로컬)
+- [ ] v0.1.1 실기기 테스트 (`docs/TEST_CHECKLIST.md` §9b + 앱 내 업데이트 §8)
 - [ ] 실기기 피드백 반영 (제스처 감도, 웹툰 모드 줌, 탭존 비율 등)
 
 ## 다음 세션이 할 일 (우선순위)
 1. ~~키스토어·secrets·`v0.1.0` 릴리스~~ 완료. `main`은 작업 브랜치와 동일(fast-forward 유지).
+1b. v0.1.1 실기기 피드백 수집 → 수정 → v0.1.2. 남은 구조 작업은 S-1(페이지 치수 캐시) → P0-4 웹툰 스트립.
 2. `docs/TEST_CHECKLIST.md`로 실기기 테스트(릴리스 빌드) → 실패 항목 수정 → TROUBLESHOOTING 기록.
 3. `docs/BACKLOG.md` P0 항목(Galaxy 자동 차단 안내, 웹툰 스트립 처리)부터 착수. 그 다음 P1.
 
@@ -43,3 +47,4 @@
 | 2026-10-07 | Release run 37617782057 (태그 v0.1.0 push) | ❌ Secrets 미완(비밀번호 2개) → 사용자 등록 |
 | 2026-10-07 | Release run 37618539572 (workflow_dispatch, main ff 후) | ❌ 서명 빌드·Trivy 통과, `Verify APK signature`의 v2 grep 오탐 → C-10으로 수정 |
 | 2026-10-07 | Release run 37619492446 (workflow_dispatch, 커밋 7b372f5의 워크플로로 태그 v0.1.0 빌드) | ✅ 서명 APK·SHA256SUMS·SIGNING-CERT·idsig·mapping 게시 |
+| 2026-10-07 | 로컬 빌드 v0.1.1 작업분 (`.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`) | ✅ 39 tests, Lint 0 errors/13 warnings(버전 핀), app-debug.apk |

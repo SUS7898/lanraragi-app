@@ -34,6 +34,12 @@ class InstallResultReceiver : BroadcastReceiver() {
             }
             PackageInstaller.STATUS_SUCCESS -> updater?.onInstallResult(true, null)
             PackageInstaller.STATUS_FAILURE_ABORTED -> updater?.onInstallResult(false, "사용자가 설치를 취소했습니다.")
+            PackageInstaller.STATUS_FAILURE_BLOCKED -> updater?.onInstallResult(
+                false,
+                "기기 정책 또는 Galaxy '자동 차단(Auto Blocker)'이 설치를 막았습니다. " +
+                    "설정 → 보안 및 개인정보 보호 → 자동 차단을 잠시 끄고 다시 시도하세요." +
+                    (message?.let { " ($it)" } ?: ""),
+            )
             else -> updater?.onInstallResult(false, message ?: "status=$status")
         }
     }

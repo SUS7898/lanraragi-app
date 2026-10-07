@@ -42,6 +42,19 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 - 리더 구성: `ReaderScreen`(호스트·크롬·시스템 UI·키) / `PagedReader`(LTR·RTL·세로, telephoto) /
   `WebtoonReader`(연속 스크롤) / `ReaderGestures`(탭 존) / `ReaderSettingsSheet`.
 - 하드웨어 볼륨키: `MainActivity.onKeyDown/Up` → `ReaderKeyEvents`(SharedFlow) → 리더.
+- **즐겨찾기(좋아요)** = LANraragi 북마크 기능(`/api/categories/bookmark_link`에 연결된 정적 카테고리). `data/FavoritesRepository`가
+  링크된 카테고리 id와 멤버 arcid 집합을 들고 서재·상세가 공유한다. 서버에 저장되므로 폰/태블릿/웹 UI가 같은 하트를 본다.
+  링크가 없으면 첫 토글 때 "즐겨찾기" 정적 카테고리를 만들어 연결한다(🔑). 북마크 API가 없는 구서버(404)는 기능을 숨긴다.
+- **평점** = 아카이브 태그 `rating:1..5`(앱 규약). 서버에 태그로 저장되어 기기 간 공유·웹 검색(`rating:5`)·서버 정렬(`sortby=rating`)이
+  된다. 쓰기는 `PUT /api/archives/{id}/metadata`에 title/tags/summary **세 값을 항상 함께**(방금 읽은 메타데이터 기준, form body) 보내
+  서버가 생략 필드를 비우는 일을 막는다. "N점 이상" 필터는 서버 검색 문법에 OR가 없어 `start=-1`(전체)로 받아 클라이언트에서 거른다.
+  로컬 전용 평점은 폰/태블릿이 갈라지므로 채택하지 않았다(결정).
+- **카테고리 순서**: 서버에는 순서 개념이 없어(pinned만) 로컬 Room `category_order(serverId, categoryId, position)`에 저장.
+  표시 정렬 `CategorySort` = 이름순(기본, 📌 먼저, 자연수 정렬 `NaturalOrder`) / 서버 순서 / 수동. 드래그 편집은 `sh.calvin.reorderable`.
+- **탭 존은 화면이 아니라 표시된 이미지 기준**(`zoneOf(contentBounds)`): telephoto `transformedContentBounds`를 뷰포트에 클램프해
+  좌우 30%/가운데 40%로 나누고, 이미지 밖 여백은 가까운 가장자리로 친다. 웹툰 모드의 탭/키는 항목 점프가 아니라 뷰포트 90% 스크롤.
+- **뒤로 가기 계층**: 리더/상세 → pop, 기록/설정 탭 → 서재 탭, 서재에 검색·필터가 있으면 → 초기화, 그 다음에야 앱 종료(`BackHandler`).
+- **크래시 로그**: `CrashLog`가 `files/crash/last-crash.txt`에 마지막 미처리 예외를 남기고 설정 → 정보에서 보기/공유/삭제. 외부 전송 없음.
 - 의도적으로 하지 않은 것: 멀티모듈, DI 프레임워크, `strings.xml` 분리(개인용·한국어 단일; 공개 배포 시 재검토).
 
 ## 4. LANraragi API 메모 (소스 `tools/openapi.yaml`, `Controller/Api/*.pm` 확인)
@@ -58,6 +71,10 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 | NEW 플래그 | `DELETE/PUT /api/archives/{id}/isnew` | |
 | 카테고리 | `GET /api/categories` | `pinned`가 0/1 또는 문자열 |
 | 탄코본 | `GET /api/tankoubons/{id}/full` | `{result:{id,name,summary,tags,archives,full_data:[Archive]}}` |
+| 북마크 링크 | `GET /api/categories/bookmark_link` → `{category_id}` (""=없음), `PUT /api/categories/bookmark_link/{id}` 🔑 | 구서버는 404 |
+| 카테고리 편집 | `PUT /api/categories?name&pinned` 🔑 → `{category_id}`, `PUT/DELETE /api/categories/{catId}/{arcid}` 🔑 | 정적 카테고리의 `archives`에 멤버 arcid |
+| 메타데이터 수정 | `PUT /api/archives/{id}/metadata` (title, tags, summary) 🔑 | **덮어쓰기** — 세 값을 항상 함께 보낼 것(form body) |
+| 전체 검색 | `GET /api/search?start=-1` | 0.8.2+: 페이지 없이 전체 결과. `sortby`는 임의 네임스페이스 허용(`rating`, `artist`…) |
 | 인증 | 헤더 `Authorization: Bearer base64(api_key)` | No-Fun 모드면 모든 API에 필요 |
 
 `arcid`가 `TANK_`로 시작하면 탄코본(묶음). 검색 결과에 섞여 나옴(`groupby_tanks=true`).
@@ -67,6 +84,11 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 (화면/가로/세로) · 배경색 · 탭 존(가장자리 이전/다음, 가운데 메뉴) · 볼륨키 · 화면 켜짐 유지 ·
 회전 잠금 · 페이지 슬라이더(RTL 반전) · 목차(TOC) 점프 · 페이지별 재시도 · 미리 받기 ·
 로컬+서버 진행률 저장/이어 읽기 · NEW 자동 해제 · 몰입 모드(시스템 바 숨김).
+
+## 5b. 서재 · 평점 · 즐겨찾기 (세션 2, v0.1.1)
+정렬 추가일/제목/최근 읽음/평점/작가/시리즈/그룹 + 임의 네임스페이스 입력 · 즐겨찾기 칩(북마크 카테고리) · 평점 N점 이상 칩 ·
+카드에 ♥/★N 배지 · 상세 화면 하트 토글 + 별 5개 · 카테고리 정렬 모드와 드래그 순서 편집 화면 · 키보드 페이지 키 ·
+펀치홀 컷아웃 영역까지 그리기 · 뒤로 가기 계층 · 서버 응답 오류로 건너뛴 항목 수 표시.
 
 ## 6. 자체 업데이트 설계
 1. `GET https://api.github.com/repos/{owner}/{repo}/releases/latest` (하루 1회 자동 + 수동).

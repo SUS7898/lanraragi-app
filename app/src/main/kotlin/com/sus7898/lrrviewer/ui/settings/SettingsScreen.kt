@@ -1,17 +1,23 @@
 package com.sus7898.lrrviewer.ui.settings
 
+import android.content.Intent
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sus7898.lrrviewer.AppGraph
 import com.sus7898.lrrviewer.BuildConfig
+import com.sus7898.lrrviewer.CrashLog
 import com.sus7898.lrrviewer.data.AppSettings
+import com.sus7898.lrrviewer.data.CategorySort
 import com.sus7898.lrrviewer.data.FitMode
 import com.sus7898.lrrviewer.data.ReaderBackground
 import com.sus7898.lrrviewer.data.ReadingMode
@@ -29,7 +35,7 @@ import kotlinx.coroutines.withContext
 private val CACHE_SIZE_OPTIONS = listOf(256, 512, 1024, 2048, 4096)
 
 @Composable
-fun SettingsScreen(graph: AppGraph) {
+fun SettingsScreen(graph: AppGraph, onOpenCategoryOrder: () -> Unit) {
     val settings by graph.settingsState.collectAsStateWithLifecycle()
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -58,8 +64,8 @@ fun SettingsScreen(graph: AppGraph) {
             ChoiceRow("읽기 방향", ReadingMode.entries, settings.readingMode, { it.label }) { v -> update { it.copy(readingMode = v) } }
             ChoiceRow("이미지 맞춤", FitMode.entries, settings.fitMode, { it.label }) { v -> update { it.copy(fitMode = v) } }
             ChoiceRow("배경색", ReaderBackground.entries, settings.background, { it.label }) { v -> update { it.copy(background = v) } }
-            SwitchRow("화면 탭으로 페이지 넘기기", settings.tapNavigation, "가장자리 탭: 이전/다음 · 가운데 탭: 메뉴") { v -> update { it.copy(tapNavigation = v) } }
-            SwitchRow("볼륨 키로 페이지 넘기기", settings.volumeKeyNavigation) { v -> update { it.copy(volumeKeyNavigation = v) } }
+            SwitchRow("화면 탭으로 페이지 넘기기", settings.tapNavigation, "이미지 양쪽 30% 탭: 이전/다음 · 가운데 탭: 메뉴") { v -> update { it.copy(tapNavigation = v) } }
+            SwitchRow("볼륨 키로 페이지 넘기기", settings.volumeKeyNavigation, "키보드(DeX)의 방향키·Page Up/Down·Space는 항상 동작") { v -> update { it.copy(volumeKeyNavigation = v) } }
             SwitchRow("읽는 동안 화면 항상 켜기", settings.keepScreenOn) { v -> update { it.copy(keepScreenOn = v) } }
             SwitchRow("페이지 번호 표시", settings.showPageNumber, "메뉴가 숨겨져 있을 때 하단에 표시") { v -> update { it.copy(showPageNumber = v) } }
             StepperRow("미리 불러올 페이지 수", settings.prefetchPages, 0..10, subtitle = "다음 페이지를 백그라운드에서 스트리밍해 디스크 캐시에 저장") { v -> update { it.copy(prefetchPages = v) } }
@@ -71,6 +77,18 @@ fun SettingsScreen(graph: AppGraph) {
             SectionTitle("서재")
             SwitchRow("탄코본(묶음)으로 그룹화", settings.groupByTankoubon, "묶음에 속한 아카이브를 한 항목으로 표시") { v -> update { it.copy(groupByTankoubon = v) } }
             StepperRow("썸네일 최소 너비 (dp)", settings.gridMinColumnDp, 80..240, step = 20, subtitle = "작을수록 한 줄에 더 많이 표시") { v -> update { it.copy(gridMinColumnDp = v) } }
+            ChoiceRow(
+                "카테고리 정렬",
+                CategorySort.entries,
+                settings.categorySort,
+                { it.label },
+                subtitle = "이름순·서버 순서는 고정(📌) 카테고리를 먼저 보여줍니다",
+            ) { v -> update { it.copy(categorySort = v) } }
+            ListItem(
+                headlineContent = { Text("카테고리 순서 직접 정하기") },
+                supportingContent = { Text("드래그로 순서를 바꾸면 '수동 순서'로 전환됩니다. 이 기기에만 저장됩니다.") },
+                modifier = Modifier.clickable(onClick = onOpenCategoryOrder),
+            )
         }
 
         item {
@@ -91,6 +109,7 @@ fun SettingsScreen(graph: AppGraph) {
         item {
             SectionTitle("정보")
             ListItem(headlineContent = { Text("버전") }, supportingContent = { Text(BuildConfig.VERSION_NAME) })
+            CrashLogItem()
             ListItem(
                 headlineContent = { Text("소스 코드 / 릴리스") },
                 supportingContent = { Text(graph.updater.repoUrl) },
@@ -102,6 +121,51 @@ fun SettingsScreen(graph: AppGraph) {
                 modifier = Modifier.clickable { context.openUrl("https://github.com/Difegue/LANraragi") },
             )
         }
+    }
+}
+
+/** Shows the last uncaught exception (kept on the device only) with share/delete actions. */
+@Composable
+private fun CrashLogItem() {
+    val context = LocalContext.current
+    var log by remember { mutableStateOf(CrashLog.read(context)) }
+    var open by remember { mutableStateOf(false) }
+    val text = log ?: return
+
+    ListItem(
+        headlineContent = { Text("최근 크래시 로그") },
+        supportingContent = { Text(text.lineSequence().firstOrNull().orEmpty()) },
+        modifier = Modifier.clickable { open = true },
+    )
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("최근 크래시 로그") },
+            text = {
+                Text(
+                    text,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = FontFamily.Monospace,
+                    modifier = Modifier
+                        .heightIn(max = 360.dp)
+                        .verticalScroll(rememberScrollState()),
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val send = Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, text)
+                        runCatching { context.startActivity(Intent.createChooser(send, "크래시 로그 공유")) }
+                    },
+                ) { Text("공유") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = { CrashLog.clear(context); log = null; open = false }) { Text("삭제") }
+                    TextButton(onClick = { open = false }) { Text("닫기") }
+                }
+            },
+        )
     }
 }
 

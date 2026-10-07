@@ -1,6 +1,8 @@
 package com.sus7898.lrrviewer.ui.library
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -18,6 +20,7 @@ fun ArchiveCard(
     thumbnailUrl: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    favorite: Boolean = false,
 ) {
     Card(onClick = onClick, modifier = modifier) {
         Column {
@@ -40,6 +43,33 @@ fun ArchiveCard(
                 ) {
                     if (archive.isnew) Badge { Text("NEW") }
                     if (archive.isTankoubon) Badge(containerColor = MaterialTheme.colorScheme.tertiary) { Text("묶음") }
+                }
+                if (favorite) {
+                    Icon(
+                        Icons.Filled.Favorite,
+                        contentDescription = "즐겨찾기",
+                        tint = Color(0xFFE53935),
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .padding(6.dp)
+                            .size(18.dp),
+                    )
+                }
+                archive.rating?.let { r ->
+                    Surface(
+                        color = Color.Black.copy(alpha = 0.6f),
+                        contentColor = Color(0xFFFFC107),
+                        shape = MaterialTheme.shapes.small,
+                        modifier = Modifier
+                            .align(Alignment.BottomStart)
+                            .padding(6.dp),
+                    ) {
+                        Text(
+                            "★ $r",
+                            style = MaterialTheme.typography.labelSmall,
+                            modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
+                        )
+                    }
                 }
                 if (archive.pagecount > 0) {
                     Surface(

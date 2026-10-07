@@ -46,6 +46,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
 import kotlin.math.roundToInt
 
+/** Fraction of the viewport a tap / key scrolls in webtoon mode. */
+private const val WEBTOON_SCROLL_FRACTION = 0.9f
+
 /** Reader host: system UI, hardware keys, chrome (top/bottom bars), sheets. Page rendering lives in PagedReader / WebtoonReader. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -63,7 +66,10 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
     var showSettings by remember { mutableStateOf(false) }
     var showToc by remember { mutableStateOf(false) }
     var orientationLocked by rememberSaveable { mutableStateOf(false) }
+    /** Page index to show (paged modes) or scroll to (webtoon). */
     val jumpEvents = remember { MutableSharedFlow<Int>(extraBufferCapacity = 8) }
+    /** Webtoon only: scroll by this fraction of the viewport height (negative = up). */
+    val scrollEvents = remember { MutableSharedFlow<Float>(extraBufferCapacity = 8) }
 
     // --- system UI -----------------------------------------------------------------------
     LaunchedEffect(chromeVisible) {
@@ -73,8 +79,19 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
         if (chromeVisible) controller.show(WindowInsetsCompat.Type.systemBars()) else controller.hide(WindowInsetsCompat.Type.systemBars())
     }
     DisposableEffect(Unit) {
+        // Draw into the display cutout (punch-hole) area while reading instead of leaving a black band.
+        val window = activity?.window
+        val previousCutoutMode = window?.attributes?.layoutInDisplayCutoutMode
+        window?.attributes = window?.attributes?.apply {
+            layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+        }
         onDispose {
-            activity?.window?.let { WindowCompat.getInsetsController(it, view).show(WindowInsetsCompat.Type.systemBars()) }
+            window?.let { w ->
+                WindowCompat.getInsetsController(w, view).show(WindowInsetsCompat.Type.systemBars())
+                w.attributes = w.attributes.apply {
+                    layoutInDisplayCutoutMode = previousCutoutMode ?: WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+                }
+            }
         }
     }
     DisposableEffect(settings.keepScreenOn) {
@@ -83,8 +100,9 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
         onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
     }
     DisposableEffect(settings.volumeKeyNavigation) {
-        ReaderKeyEvents.active = settings.volumeKeyNavigation
-        onDispose { ReaderKeyEvents.active = false }
+        ReaderKeyEvents.active = true
+        ReaderKeyEvents.volumeKeys = settings.volumeKeyNavigation
+        onDispose { ReaderKeyEvents.active = false; ReaderKeyEvents.volumeKeys = false }
     }
     DisposableEffect(orientationLocked) {
         activity?.requestedOrientation =
@@ -92,13 +110,21 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
         onDispose { if (orientationLocked) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
 
-    // --- hardware keys -------------------------------------------------------------------
-    LaunchedEffect(Unit) {
-        ReaderKeyEvents.events.collect { key ->
-            val s = vm.state.value
-            val target = if (key == ReaderKey.NEXT) s.currentPage + 1 else s.currentPage - 1
-            if (target in 0 until s.pageCount) jumpEvents.tryEmit(target)
+    // --- navigation ----------------------------------------------------------------------
+    /** Next/previous for taps and keys: a page in paged modes, most of a screen in webtoon mode. */
+    fun navigate(forward: Boolean) {
+        val s = vm.state.value
+        val mode = s.readingModeOverride ?: graph.settingsState.value.readingMode
+        if (mode == ReadingMode.WEBTOON) {
+            scrollEvents.tryEmit(if (forward) WEBTOON_SCROLL_FRACTION else -WEBTOON_SCROLL_FRACTION)
+            return
         }
+        val target = if (forward) s.currentPage + 1 else s.currentPage - 1
+        if (target in 0 until s.pageCount) jumpEvents.tryEmit(target) else chromeVisible = true
+    }
+
+    LaunchedEffect(Unit) {
+        ReaderKeyEvents.events.collect { key -> navigate(forward = key == ReaderKey.NEXT) }
     }
 
     fun onZoneTap(zone: TapZone) {
@@ -113,8 +139,7 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             TapZone.BOTTOM -> true
             TapZone.CENTER -> true
         }
-        val target = if (forward) state.currentPage + 1 else state.currentPage - 1
-        if (target in 0 until state.pageCount) jumpEvents.tryEmit(target) else chromeVisible = true
+        navigate(forward)
     }
 
     val background = when (settings.background) {
@@ -138,6 +163,7 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                 pages = state.pages,
                 initialPage = state.currentPage,
                 jumpEvents = jumpEvents,
+                scrollEvents = scrollEvents,
                 onPageChanged = vm::onPageChanged,
                 onTap = ::onZoneTap,
             )

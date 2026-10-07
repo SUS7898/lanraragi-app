@@ -122,6 +122,10 @@
 - 수동 재실행(`workflow_dispatch`)은 **기본 브랜치의 워크플로 파일**이 있어야 등록된다. `main`이 초기 커밋뿐이라 422가 났고,
   작업 브랜치를 `main`으로 fast-forward한 뒤에야 `gh workflow run Release -f tag=v0.1.0`이 가능해졌다(Security Scan 주간 예약도 동일).
 
+### C-11. 컴파일 오류 `Unresolved reference 'n점'` — 한글이 붙은 문자열 템플릿
+- 원인: Kotlin 식별자는 유니코드 문자를 허용하므로 `"$n점"`은 변수 `n점`을 찾는다. 한글(및 다른 비ASCII 문자)이 바로 뒤에 오면 반드시 `"${n}점"`.
+- 재발 방지: 한국어 UI 문자열에서 템플릿 뒤에 글자가 붙으면 항상 중괄호를 쓴다.
+
 ## E. 구조 개편(세션 1 후반) 시 확인한 사항 — Room · Coil 3 · 타입 안전 내비게이션
 
 ### E-1. 왜 "전면 개편"이 아니라 "선택적 조기 교체"인가 (결정 기록)
@@ -210,3 +214,9 @@
 
 ### F-4. 로컬 빌드 산출물 — Room 스키마
 - 로컬 빌드로 `app/schemas/com.sus7898.lrrviewer.data.db.AppDatabase/1.json`이 생성됨(E-3). 첫 릴리스 전에 커밋한다.
+- v0.1.1: `category_order` 테이블 추가 → version 2 + `AutoMigration(1→2)`, `2.json`을 같은 커밋에 포함. 테이블 추가만이라 스펙 클래스 불필요.
+
+### F-5. ViewModel 단위 테스트에서 MockWebServer 응답 순서
+- `LibraryViewModel`은 init에서 검색·카테고리·북마크 링크·info를 **동시에** 요청하므로 `enqueue` 순서 큐가 어긋난다.
+  → `server.dispatcher = object : Dispatcher()`로 경로별 응답을 돌려주고, `Dispatchers.setMain(UnconfinedTestDispatcher())` + `state.first { … }`로 기다린다.
+- `Collator.getInstance(Locale.KOREAN)`은 라틴 문자를 한글보다 앞에 둔다(`Apple` < `Vol 2` < `즐겨찾기`). 정렬 테스트 기대값을 그에 맞춘다.

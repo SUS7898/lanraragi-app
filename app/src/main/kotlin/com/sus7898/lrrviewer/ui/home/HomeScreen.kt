@@ -1,5 +1,6 @@
 package com.sus7898.lrrviewer.ui.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -37,10 +38,14 @@ fun HomeScreen(
     graph: AppGraph,
     onOpenArchive: (String) -> Unit,
     onOpenReader: (String, Int) -> Unit,
+    onOpenCategoryOrder: () -> Unit,
 ) {
     var tab by rememberSaveable { mutableStateOf(HomeTab.LIBRARY) }
     val pendingSearch by graph.pendingLibrarySearch.collectAsStateWithLifecycle()
     LaunchedEffect(pendingSearch) { if (pendingSearch != null) tab = HomeTab.LIBRARY }
+
+    // Back from 기록/설정 returns to the library; the library itself clears its filters before the app exits.
+    BackHandler(enabled = tab != HomeTab.LIBRARY) { tab = HomeTab.LIBRARY }
 
     Scaffold(
         bottomBar = {
@@ -60,7 +65,7 @@ fun HomeScreen(
             when (tab) {
                 HomeTab.LIBRARY -> LibraryScreen(graph = graph, onOpenArchive = onOpenArchive)
                 HomeTab.HISTORY -> HistoryScreen(graph = graph, onOpenArchive = onOpenArchive, onOpenReader = onOpenReader)
-                HomeTab.SETTINGS -> SettingsScreen(graph = graph)
+                HomeTab.SETTINGS -> SettingsScreen(graph = graph, onOpenCategoryOrder = onOpenCategoryOrder)
             }
         }
     }

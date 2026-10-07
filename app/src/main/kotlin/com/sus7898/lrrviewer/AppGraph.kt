@@ -8,6 +8,8 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import com.sus7898.lrrviewer.data.AppSettings
+import com.sus7898.lrrviewer.data.CategoryOrderRepository
+import com.sus7898.lrrviewer.data.FavoritesRepository
 import com.sus7898.lrrviewer.data.ReadingProgressRepository
 import com.sus7898.lrrviewer.data.SecureStore
 import com.sus7898.lrrviewer.data.SettingsRepository
@@ -57,6 +59,10 @@ class AppGraph(private val app: Application) {
 
     val database: AppDatabase = AppDatabase.create(app)
     val progress = ReadingProgressRepository(database.readingProgressDao())
+    val categoryOrder = CategoryOrderRepository(database.categoryOrderDao())
+
+    /** Server-side bookmarks ("좋아요"); shared by the library and the detail screen so hearts stay in sync. */
+    val favorites = FavoritesRepository(api, settingsState)
 
     val imageLoader: ImageLoader = ImageLoader.Builder(app)
         // Same OkHttp client as the API, so the auth interceptor and cleartext policy apply to images too.

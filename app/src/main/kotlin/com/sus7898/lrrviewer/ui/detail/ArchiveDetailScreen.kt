@@ -8,13 +8,18 @@ import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.StarBorder
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -44,7 +49,9 @@ fun ArchiveDetailScreen(
     onOpenArchive: (String) -> Unit,
     onSearchTag: (String) -> Unit,
 ) {
-    val vm: ArchiveDetailViewModel = viewModel(key = "detail_$id") { ArchiveDetailViewModel(graph.api, graph.progress, id) }
+    val vm: ArchiveDetailViewModel = viewModel(key = "detail_$id") {
+        ArchiveDetailViewModel(graph.api, graph.progress, graph.favorites, graph.settingsState, id)
+    }
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
@@ -67,6 +74,15 @@ fun ArchiveDetailScreen(
                     IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "뒤로") }
                 },
                 actions = {
+                    if (state.archive != null && state.favoritesSupported) {
+                        IconButton(onClick = vm::toggleFavorite, enabled = !state.busy) {
+                            Icon(
+                                if (state.favorite) Icons.Filled.Favorite else Icons.Filled.FavoriteBorder,
+                                contentDescription = if (state.favorite) "즐겨찾기 해제" else "즐겨찾기에 추가",
+                                tint = if (state.favorite) Color(0xFFE53935) else LocalContentColor.current,
+                            )
+                        }
+                    }
                     IconButton(onClick = { context.openUrl(graph.api.webReaderUrl(id)) }) {
                         Icon(Icons.Filled.OpenInBrowser, contentDescription = "웹에서 열기")
                     }
@@ -83,6 +99,7 @@ fun ArchiveDetailScreen(
             tank != null -> TankoubonContent(
                 tank = tank,
                 archives = state.tankArchives,
+                favoriteIds = graph.favorites.state.collectAsStateWithLifecycle().value.ids,
                 graph = graph,
                 padding = padding,
                 onOpenArchive = onOpenArchive,
@@ -93,10 +110,12 @@ fun ArchiveDetailScreen(
                 thumbnailUrl = graph.api.thumbnailUrl(id),
                 resumePage = vm.resumePage(),
                 busy = state.busy,
+                canEdit = state.canEdit,
                 padding = padding,
                 onOpenReader = onOpenReader,
                 onToggleNew = vm::toggleNew,
                 onReextract = vm::forceReextract,
+                onRate = vm::setRating,
                 onSearchTag = onSearchTag,
             )
         }
@@ -110,14 +129,19 @@ private fun ArchiveContent(
     thumbnailUrl: String,
     resumePage: Int?,
     busy: Boolean,
+    canEdit: Boolean,
     padding: PaddingValues,
     onOpenReader: (Int) -> Unit,
     onToggleNew: () -> Unit,
     onReextract: () -> Unit,
+    onRate: (Int?) -> Unit,
     onSearchTag: (String) -> Unit,
 ) {
     val tagGroups = remember(archive.tags) {
-        archive.tagList.filter { it.namespace != "date_added" }.groupBy { it.namespace }.toSortedMap(compareBy<String> { it.isEmpty() }.thenBy { it })
+        archive.tagList
+            .filter { it.namespace != "date_added" && it.namespace != Archive.RATING_NAMESPACE }
+            .groupBy { it.namespace }
+            .toSortedMap(compareBy<String> { it.isEmpty() }.thenBy { it })
     }
     val toc = remember(archive.toc) { archive.tocEntries }
 
@@ -155,6 +179,10 @@ private fun ArchiveContent(
                     if (archive.isnew) Badge { Text("NEW") }
                 }
             }
+        }
+
+        item {
+            RatingRow(rating = archive.rating, enabled = canEdit && !busy, onRate = onRate)
         }
 
         item {
@@ -213,6 +241,38 @@ private fun ArchiveContent(
     }
 }
 
+/** Five tappable stars; tapping the current rating clears it. Stored on the server as a `rating:N` tag. */
+@Composable
+private fun RatingRow(rating: Int?, enabled: Boolean, onRate: (Int?) -> Unit) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("평점", style = MaterialTheme.typography.labelLarge, modifier = Modifier.width(48.dp))
+            (1..5).forEach { n ->
+                IconButton(onClick = { onRate(if (rating == n) null else n) }, enabled = enabled, modifier = Modifier.size(36.dp)) {
+                    Icon(
+                        if (rating != null && n <= rating) Icons.Filled.Star else Icons.Filled.StarBorder,
+                        contentDescription = "${n}점",
+                        tint = if (rating != null && n <= rating) Color(0xFFFFC107) else LocalContentColor.current,
+                    )
+                }
+            }
+            Spacer(Modifier.width(8.dp))
+            Text(
+                rating?.let { "$it / 5" } ?: "없음",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+        if (!enabled) {
+            Text(
+                "평점·즐겨찾기는 서버 태그/카테고리에 저장됩니다. 설정에서 API 키를 입력하면 바꿀 수 있습니다.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+            )
+        }
+    }
+}
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun TagGroup(namespace: String, tags: List<Tag>, onSearchTag: (String) -> Unit) {
@@ -245,6 +305,7 @@ private fun InfoLine(label: String, value: String) {
 private fun TankoubonContent(
     tank: TankoubonFull,
     archives: List<Archive>,
+    favoriteIds: Set<String>,
     graph: AppGraph,
     padding: PaddingValues,
     onOpenArchive: (String) -> Unit,
@@ -271,7 +332,12 @@ private fun TankoubonContent(
             }
         }
         items(archives, key = { it.arcid }) { a ->
-            ArchiveCard(archive = a, thumbnailUrl = graph.api.thumbnailUrl(a.arcid), onClick = { onOpenArchive(a.arcid) })
+            ArchiveCard(
+                archive = a,
+                thumbnailUrl = graph.api.thumbnailUrl(a.arcid),
+                favorite = a.arcid in favoriteIds,
+                onClick = { onOpenArchive(a.arcid) },
+            )
         }
         if (archives.isEmpty()) {
             item(span = { GridItemSpan(maxLineSpan) }) {

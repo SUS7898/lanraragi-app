@@ -17,6 +17,8 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
 - 서명 키(`*.jks`, `keystore.properties`)는 절대 커밋하지 않는다 (`.gitignore` 참조).
 - 커밋 메시지·코드 주석에 모델 식별자를 넣지 않는다.
 - 숫자/불리언 JSON 필드는 반드시 `LenientXxxSerializer`로 파싱한다 (Mihon 확장이 깨진 원인).
+- 평점은 서버 태그 `rating:N`, 즐겨찾기는 서버 북마크 카테고리다. 메타데이터 PUT은 title/tags/summary를 항상 함께 보낸다(덮어쓰기 API).
+- 한국어가 바로 뒤에 오는 문자열 템플릿은 `"${n}점"`처럼 중괄호 필수 (`"$n점"`은 식별자 `n점`으로 해석됨).
 - 새 화면은 `ui/AppRoot.kt`에 `@Serializable` 라우트로 추가한다(문자열 라우트 금지). 로컬 저장은 Room 엔티티에 `serverId` 컬럼 필수.
 - Room 엔티티를 바꾸면 version 증가 + Migration/AutoMigration, 로컬 빌드로 `app/schemas/` 갱신 후 커밋.
 
@@ -44,6 +46,9 @@ app/src/main/kotlin/com/sus7898/lrrviewer/
   data/SecureStore.kt          Android Keystore AES-GCM
   data/db/AppDatabase.kt       Room: reading_progress(serverId, arcid, …) + DAO. 스키마 JSON은 app/schemas/ (로컬 빌드 후 커밋)
   data/ReadingProgressRepository.kt  로컬 읽기 기록/진행률/작품별 읽기 방향 (Room 위)
+  data/CategoryOrderRepository.kt    카테고리 수동 순서 (Room category_order), data/CategorySorting.kt 정렬 모드·자연수 정렬
+  data/FavoritesRepository.kt        즐겨찾기 = 서버 북마크 카테고리(멤버 집합 공유, 🔑 토글)
+  CrashLog.kt                        마지막 미처리 예외를 files/crash/에 저장 (설정 → 정보)
   data/api/LrrApi.kt           LANraragi API 클라이언트 (OkHttp + kotlinx.serialization)
   data/api/Models.kt           Archive/ServerInfo/… (관대한 파싱)
   data/api/LenientSerializers.kt  "" / "3" / null / "none" 모두 허용하는 직렬화기
@@ -52,7 +57,7 @@ app/src/main/kotlin/com/sus7898/lrrviewer/
   update/UpdateManager.kt      GitHub Releases 확인 → 다운로드(SHA-256) → 서명 인증서 검증 → PackageInstaller
   update/InstallResultReceiver.kt  설치 세션 결과 수신(사용자 확인 화면 띄움)
   ui/AppRoot.kt                타입 안전 라우트(SetupRoute/HomeRoute/ArchiveRoute/ReaderRoute) + 자동 업데이트 다이얼로그
-  ui/home/, ui/library/, ui/history/, ui/detail/, ui/settings/
+  ui/home/, ui/library/, ui/history/, ui/detail/, ui/settings/ (CategoryOrderScreen = 드래그 순서 편집, sh.calvin.reorderable)
   ui/reader/ReaderScreen.kt    호스트(크롬·시스템 UI·키) / PagedReader.kt / WebtoonReader.kt / ReaderGestures.kt / ReaderViewModel.kt(Deps)
 app/src/test/…                 JVM 단위 테스트(MockWebServer 포함)
 .github/workflows/ci.yml       테스트·린트·디버그 APK

@@ -29,6 +29,7 @@ import com.sus7898.lrrviewer.ui.common.rememberResumeTick
 import com.sus7898.lrrviewer.ui.detail.ArchiveDetailScreen
 import com.sus7898.lrrviewer.ui.home.HomeScreen
 import com.sus7898.lrrviewer.ui.reader.ReaderScreen
+import com.sus7898.lrrviewer.ui.settings.CategoryOrderScreen
 import com.sus7898.lrrviewer.ui.settings.ServerSetupScreen
 import com.sus7898.lrrviewer.update.UpdateManager
 import kotlinx.coroutines.delay
@@ -39,6 +40,7 @@ import kotlinx.serialization.Serializable
 @Serializable object HomeRoute
 @Serializable data class ArchiveRoute(val id: String)
 @Serializable data class ReaderRoute(val id: String, val page: Int = -1)
+@Serializable object CategoryOrderRoute
 
 @Composable
 fun AppRoot(graph: AppGraph, settings: AppSettings) {
@@ -57,6 +59,7 @@ fun AppRoot(graph: AppGraph, settings: AppSettings) {
                 graph = graph,
                 onOpenArchive = { id -> navController.navigate(ArchiveRoute(id)) },
                 onOpenReader = { id, page -> navController.navigate(ReaderRoute(id, page)) },
+                onOpenCategoryOrder = { navController.navigate(CategoryOrderRoute) },
             )
         }
         composable<ArchiveRoute> { entry ->
@@ -77,6 +80,9 @@ fun AppRoot(graph: AppGraph, settings: AppSettings) {
             val route = entry.toRoute<ReaderRoute>()
             ReaderScreen(graph = graph, arcId = route.id, startPage = route.page, onBack = { navController.popBackStack() })
         }
+        composable<CategoryOrderRoute> {
+            CategoryOrderScreen(graph = graph, onBack = { navController.popBackStack() })
+        }
     }
 
     AutoUpdateCheck(graph)
@@ -93,7 +99,10 @@ private fun AutoUpdateCheck(graph: AppGraph) {
         if (now - s.lastUpdateCheck < 24L * 60 * 60 * 1000) return@LaunchedEffect
         delay(2_000)
         graph.updater.check(auto = true)
-        graph.settings.edit { it.copy(lastUpdateCheck = now) }
+        // A failed check (offline, GitHub down) must not count as "checked today".
+        if (graph.updater.state.value !is UpdateManager.State.Error) {
+            graph.settings.edit { it.copy(lastUpdateCheck = now) }
+        }
     }
 }
 

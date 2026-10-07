@@ -40,6 +40,7 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         val THEME = stringPreferencesKey("theme_mode")
         val GRID_MIN_DP = intPreferencesKey("grid_min_column_dp")
         val GROUP_TANKS = booleanPreferencesKey("group_by_tankoubon")
+        val CATEGORY_SORT = stringPreferencesKey("category_sort")
         val AUTO_UPDATE = booleanPreferencesKey("auto_check_updates")
         val LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
     }
@@ -82,6 +83,7 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         themeMode = enumOrDefault(this[Keys.THEME], ThemeMode.SYSTEM),
         gridMinColumnDp = this[Keys.GRID_MIN_DP] ?: 120,
         groupByTankoubon = this[Keys.GROUP_TANKS] ?: true,
+        categorySort = enumOrDefault(this[Keys.CATEGORY_SORT], CategorySort.NAME),
         autoCheckUpdates = this[Keys.AUTO_UPDATE] ?: true,
         lastUpdateCheck = this[Keys.LAST_UPDATE_CHECK] ?: 0L,
     )
@@ -104,6 +106,7 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         this[Keys.THEME] = s.themeMode.name
         this[Keys.GRID_MIN_DP] = s.gridMinColumnDp.coerceIn(80, 240)
         this[Keys.GROUP_TANKS] = s.groupByTankoubon
+        this[Keys.CATEGORY_SORT] = s.categorySort.name
         this[Keys.AUTO_UPDATE] = s.autoCheckUpdates
         this[Keys.LAST_UPDATE_CHECK] = s.lastUpdateCheck
     }

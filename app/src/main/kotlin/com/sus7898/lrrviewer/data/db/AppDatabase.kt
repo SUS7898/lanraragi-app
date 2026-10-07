@@ -1,12 +1,15 @@
 package com.sus7898.lrrviewer.data.db
 
 import android.content.Context
+import androidx.room.AutoMigration
 import androidx.room.Dao
 import androidx.room.Database
 import androidx.room.Entity
+import androidx.room.Insert
 import androidx.room.Query
 import androidx.room.Room
 import androidx.room.RoomDatabase
+import androidx.room.Transaction
 import androidx.room.Upsert
 import kotlinx.coroutines.flow.Flow
 
@@ -47,9 +50,41 @@ interface ReadingProgressDao {
     suspend fun deleteAll(serverId: String)
 }
 
-@Database(entities = [ReadingProgressEntity::class], version = 1, exportSchema = true)
+/** User-defined display order of server categories (local only; the server has no category ordering). */
+@Entity(tableName = "category_order", primaryKeys = ["serverId", "categoryId"])
+data class CategoryOrderEntity(
+    val serverId: String,
+    val categoryId: String,
+    val position: Int,
+)
+
+@Dao
+interface CategoryOrderDao {
+    @Query("SELECT categoryId FROM category_order WHERE serverId = :serverId ORDER BY position ASC")
+    fun observeOrder(serverId: String): Flow<List<String>>
+
+    @Insert
+    suspend fun insertAll(rows: List<CategoryOrderEntity>)
+
+    @Query("DELETE FROM category_order WHERE serverId = :serverId")
+    suspend fun deleteAll(serverId: String)
+
+    @Transaction
+    suspend fun replace(serverId: String, categoryIds: List<String>) {
+        deleteAll(serverId)
+        insertAll(categoryIds.mapIndexed { i, id -> CategoryOrderEntity(serverId, id, i) })
+    }
+}
+
+@Database(
+    entities = [ReadingProgressEntity::class, CategoryOrderEntity::class],
+    version = 2,
+    exportSchema = true,
+    autoMigrations = [AutoMigration(from = 1, to = 2)],
+)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun readingProgressDao(): ReadingProgressDao
+    abstract fun categoryOrderDao(): CategoryOrderDao
 
     companion object {
         fun create(context: Context): AppDatabase =

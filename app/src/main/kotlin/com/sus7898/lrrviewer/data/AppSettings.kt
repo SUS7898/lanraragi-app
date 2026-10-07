@@ -47,6 +47,7 @@ data class AppSettings(
     val themeMode: ThemeMode = ThemeMode.SYSTEM,
     val gridMinColumnDp: Int = 120,
     val groupByTankoubon: Boolean = true,
+    val categorySort: CategorySort = CategorySort.NAME,
     val autoCheckUpdates: Boolean = true,
     val lastUpdateCheck: Long = 0L,
 ) {

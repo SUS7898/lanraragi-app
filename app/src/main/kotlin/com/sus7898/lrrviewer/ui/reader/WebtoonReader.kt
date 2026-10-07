@@ -1,5 +1,6 @@
 package com.sus7898.lrrviewer.ui.reader
 
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
@@ -56,6 +57,7 @@ fun WebtoonReader(
     pages: List<String>,
     initialPage: Int,
     jumpEvents: SharedFlow<Int>,
+    scrollEvents: SharedFlow<Float>,
     onPageChanged: (Int) -> Unit,
     onTap: (TapZone) -> Unit,
 ) {
@@ -65,6 +67,13 @@ fun WebtoonReader(
     }
     LaunchedEffect(jumpEvents) {
         jumpEvents.collect { p -> if (p in pages.indices) listState.scrollToItem(p) }
+    }
+    // Taps on the top/bottom zones and page keys scroll by a fraction of the viewport, not by whole (tall) items.
+    LaunchedEffect(scrollEvents) {
+        scrollEvents.collect { fraction ->
+            val viewport = listState.layoutInfo.viewportSize.height
+            if (viewport > 0) listState.animateScrollBy(viewport * fraction)
+        }
     }
 
     var scale by remember { mutableFloatStateOf(1f) }
