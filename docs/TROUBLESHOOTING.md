@@ -54,6 +54,13 @@
 - 첫 push 후 CI 로그에서 나온 컴파일 오류와 수정 내용을 항목별로 추가할 것.
 
 ## D. 라이브러리 API 함정 (컴파일 전 확인한 가정)
+- **minSdk는 28**: 업데이트 검증에 쓰는 `PackageInfo.signingInfo`, `longVersionCode`, `GET_SIGNING_CERTIFICATES`가
+  API 28. minSdk 26이면 Lint `NewApi` 오류로 CI 실패. (Galaxy 2018년 이후 기기 모두 해당)
+- okio `BufferedSource.request(Long)` — Int 리터럴 넘기면 컴파일 오류. 체크섬 파일은 `body.string()`으로 단순화.
+- 컴포저블 슬롯 `supportingContent = subtitle?.let { { Text(it) } }`는 람다 타입 추론이 불안정 →
+  `if (subtitle != null) { { Text(subtitle) } } else null` 형태 사용.
+- kotlinx.serialization 1.8.1: `Json.decodeFromString<T>(string)`/`encodeToString<T>`는 **reified 멤버**(import 불필요),
+  `Json.decodeFromJsonElement<T>`는 `kotlinx.serialization.json` 패키지의 **확장 함수**(import 필요). 소스 jar로 확인함.
 - Material3 `PullToRefreshBox`는 1.3.0+ (BOM 2025.06.01 → material3 1.3.2) ✔.
 - `LocalLifecycleOwner`는 `androidx.lifecycle.compose`에서 import (ui.platform 버전은 deprecated).
 - `Modifier.transformable(state, canPan = {...})` 오버로드로 LazyColumn 세로 스크롤과 충돌 완화.

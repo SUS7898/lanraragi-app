@@ -201,7 +201,9 @@ class UpdateManager(
         release.checksumUrl?.let { url ->
             val listing = client.newCall(Request.Builder().url(url).build()).execute().use { r ->
                 if (!r.isSuccessful) throw IOException("체크섬 파일 다운로드 실패 (HTTP ${r.code})")
-                r.body?.source()?.let { src -> src.request(64 * 1024); src.buffer.readUtf8() }.orEmpty()
+                val body = r.body ?: throw IOException("체크섬 파일이 비어 있습니다")
+                if (body.contentLength() > 1L * 1024 * 1024) throw IOException("체크섬 파일이 비정상적으로 큽니다")
+                body.string()
             }
             Checksums.findSha256(listing, release.apkName)?.let { return it }
         }

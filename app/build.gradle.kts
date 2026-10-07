@@ -59,7 +59,7 @@ android {
 
     defaultConfig {
         applicationId = "com.sus7898.lrrviewer"
-        minSdk = 26
+        minSdk = 28
         targetSdk = 35
         versionCode = appVersionCode
         versionName = appVersionName
@@ -76,7 +76,7 @@ android {
                 storePassword = signingValue("storePassword", "KEYSTORE_PASSWORD")
                 keyAlias = signingValue("keyAlias", "KEY_ALIAS")
                 keyPassword = signingValue("keyPassword", "KEY_PASSWORD")
-                // minSdk 26 => v1 (JAR) signing is unnecessary; v2/v3 are what Android actually verifies.
+                // minSdk 28 => v1 (JAR) signing is unnecessary; v2/v3 are what Android actually verifies.
                 enableV1Signing = false
                 enableV2Signing = true
                 enableV3Signing = true

@@ -54,4 +54,4 @@ app/src/test/…                 JVM 단위 테스트(MockWebServer 포함)
 ## 버전 핀 (의도적으로 고정 — 함부로 올리지 말 것, 올리면 CI로 검증)
 AGP 8.10.1 · Kotlin 2.1.21 · Gradle 8.14.3 · Compose BOM 2025.06.01 · Coil 2.7.0 ·
 telephoto 0.16.0 (zoomable-image-coil, Coil2용) · OkHttp 4.12.0 · kotlinx.serialization 1.8.1
-compileSdk/targetSdk 35, minSdk 26. 자세한 이유는 `docs/DESIGN.md` §버전.
+compileSdk/targetSdk 35, minSdk 28 (signingInfo·longVersionCode가 API 28). 자세한 이유는 `docs/DESIGN.md` §버전.

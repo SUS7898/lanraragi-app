@@ -87,7 +87,7 @@ fun SwitchRow(
 ) {
     ListItem(
         headlineContent = { Text(title) },
-        supportingContent = subtitle?.let { { Text(it) } },
+        supportingContent = if (subtitle != null) { { Text(subtitle) } } else null,
         trailingContent = { Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled) },
         modifier = Modifier.clickable(enabled = enabled) { onCheckedChange(!checked) },
     )
@@ -104,7 +104,7 @@ fun StepperRow(
 ) {
     ListItem(
         headlineContent = { Text(title) },
-        supportingContent = subtitle?.let { { Text(it) } },
+        supportingContent = if (subtitle != null) { { Text(subtitle) } } else null,
         trailingContent = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = { onValueChange((value - step).coerceIn(range)) }, enabled = value > range.first) {
@@ -132,7 +132,7 @@ fun <T> ChoiceRow(
     var expanded by remember { mutableStateOf(false) }
     ListItem(
         headlineContent = { Text(title) },
-        supportingContent = subtitle?.let { { Text(it) } },
+        supportingContent = if (subtitle != null) { { Text(subtitle) } } else null,
         trailingContent = {
             Box {
                 TextButton(onClick = { expanded = true }) { Text(label(selected)) }
