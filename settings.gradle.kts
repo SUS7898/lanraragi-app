@@ -1,12 +1,8 @@
 pluginManagement {
     repositories {
-        google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
-            }
-        }
+        // No content filters here on purpose: a "com.google.*" filter would pin the KSP plugin
+        // (com.google.devtools.ksp) to google(), where it is not published.
+        google()
         mavenCentral()
         gradlePluginPortal()
     }

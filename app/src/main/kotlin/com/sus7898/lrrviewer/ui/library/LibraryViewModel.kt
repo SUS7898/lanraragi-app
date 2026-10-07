@@ -2,7 +2,8 @@ package com.sus7898.lrrviewer.ui.library
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.sus7898.lrrviewer.AppGraph
+import com.sus7898.lrrviewer.data.AppSettings
+import com.sus7898.lrrviewer.data.api.LrrApi
 import com.sus7898.lrrviewer.data.api.Archive
 import com.sus7898.lrrviewer.data.api.Category
 import com.sus7898.lrrviewer.data.api.SearchQuery
@@ -10,6 +11,7 @@ import com.sus7898.lrrviewer.data.api.ServerInfo
 import com.sus7898.lrrviewer.data.api.userMessage
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
@@ -17,7 +19,10 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class LibraryViewModel(private val graph: AppGraph) : ViewModel() {
+class LibraryViewModel(
+    private val api: LrrApi,
+    private val settings: StateFlow<AppSettings>,
+) : ViewModel() {
 
     data class UiState(
         val items: List<Archive> = emptyList(),
@@ -35,7 +40,7 @@ class LibraryViewModel(private val graph: AppGraph) : ViewModel() {
         val searchText: String = "",
     )
 
-    private val _state = MutableStateFlow(UiState(query = SearchQuery(groupTanks = graph.settingsState.value.groupByTankoubon)))
+    private val _state = MutableStateFlow(UiState(query = SearchQuery(groupTanks = settings.value.groupByTankoubon)))
     val state = _state.asStateFlow()
 
     private var loadJob: Job? = null
@@ -44,7 +49,7 @@ class LibraryViewModel(private val graph: AppGraph) : ViewModel() {
         refresh()
         loadServerData()
         viewModelScope.launch {
-            graph.settingsState
+            settings
                 .map { Triple(it.serverUrl, it.apiKey, it.groupByTankoubon) }
                 .distinctUntilChanged()
                 .drop(1)
@@ -81,7 +86,7 @@ class LibraryViewModel(private val graph: AppGraph) : ViewModel() {
         loadJob = viewModelScope.launch {
             _state.update { it.copy(loading = it.items.isEmpty(), refreshing = it.items.isNotEmpty(), error = null, endReached = false) }
             try {
-                val page = graph.api.search(_state.value.query, start = 0)
+                val page = api.search(_state.value.query, start = 0)
                 _state.update {
                     it.copy(
                         items = page.items,
@@ -105,7 +110,7 @@ class LibraryViewModel(private val graph: AppGraph) : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(loadingMore = true) }
             try {
-                val page = graph.api.search(s.query, start = s.items.size)
+                val page = api.search(s.query, start = s.items.size)
                 val merged = (s.items + page.items).distinctBy { it.arcid }
                 _state.update {
                     it.copy(
@@ -124,7 +129,7 @@ class LibraryViewModel(private val graph: AppGraph) : ViewModel() {
 
     fun random(onResult: (Archive?) -> Unit) {
         viewModelScope.launch {
-            val result = runCatching { graph.api.random(_state.value.query, 1).firstOrNull() }.getOrNull()
+            val result = runCatching { api.random(_state.value.query, 1).firstOrNull() }.getOrNull()
             onResult(result)
         }
     }
@@ -133,8 +138,8 @@ class LibraryViewModel(private val graph: AppGraph) : ViewModel() {
 
     private fun loadServerData() {
         viewModelScope.launch {
-            runCatching { graph.api.categories() }.onSuccess { c -> _state.update { it.copy(categories = c) } }
-            runCatching { graph.api.info() }.onSuccess { i -> _state.update { it.copy(serverInfo = i) } }
+            runCatching { api.categories() }.onSuccess { c -> _state.update { it.copy(categories = c) } }
+            runCatching { api.info() }.onSuccess { i -> _state.update { it.copy(serverInfo = i) } }
         }
     }
 }

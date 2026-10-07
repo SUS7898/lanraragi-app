@@ -2,7 +2,8 @@ package com.sus7898.lrrviewer.ui.detail
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.sus7898.lrrviewer.AppGraph
+import com.sus7898.lrrviewer.data.ReadingProgressRepository
+import com.sus7898.lrrviewer.data.api.LrrApi
 import com.sus7898.lrrviewer.data.api.Archive
 import com.sus7898.lrrviewer.data.api.TankoubonFull
 import com.sus7898.lrrviewer.data.api.userMessage
@@ -11,7 +12,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-class ArchiveDetailViewModel(private val graph: AppGraph, val id: String) : ViewModel() {
+class ArchiveDetailViewModel(
+    private val api: LrrApi,
+    private val progress: ReadingProgressRepository,
+    val id: String,
+) : ViewModel() {
 
     data class UiState(
         val loading: Boolean = true,
@@ -35,11 +40,11 @@ class ArchiveDetailViewModel(private val graph: AppGraph, val id: String) : View
             _state.update { it.copy(loading = true, error = null) }
             try {
                 if (id.startsWith("TANK_")) {
-                    val (tank, archives) = graph.api.tankoubon(id)
+                    val (tank, archives) = api.tankoubon(id)
                     _state.update { it.copy(loading = false, tank = tank, tankArchives = archives) }
                 } else {
-                    val archive = graph.api.metadata(id)
-                    val local = graph.history.get(id)
+                    val archive = api.metadata(id)
+                    val local = progress.get(id)
                     _state.update { it.copy(loading = false, archive = archive, localPage = local?.page) }
                 }
             } catch (e: Exception) {
@@ -62,7 +67,7 @@ class ArchiveDetailViewModel(private val graph: AppGraph, val id: String) : View
         val a = _state.value.archive ?: return
         viewModelScope.launch {
             _state.update { it.copy(busy = true) }
-            runCatching { if (a.isnew) graph.api.clearNew(id) else graph.api.setNew(id) }
+            runCatching { if (a.isnew) api.clearNew(id) else api.setNew(id) }
                 .onFailure { e -> _state.update { it.copy(message = e.userMessage()) } }
             _state.update { it.copy(busy = false) }
             load()
@@ -72,7 +77,7 @@ class ArchiveDetailViewModel(private val graph: AppGraph, val id: String) : View
     fun forceReextract() {
         viewModelScope.launch {
             _state.update { it.copy(busy = true) }
-            runCatching { graph.api.files(id, force = true) }
+            runCatching { api.files(id, force = true) }
                 .onSuccess { _state.update { it.copy(message = "서버에 재추출을 요청했습니다.") } }
                 .onFailure { e -> _state.update { it.copy(message = e.userMessage()) } }
             _state.update { it.copy(busy = false) }

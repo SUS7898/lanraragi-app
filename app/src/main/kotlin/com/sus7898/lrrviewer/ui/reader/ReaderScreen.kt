@@ -8,16 +8,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.rememberTransformableState
-import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.VerticalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
@@ -26,24 +17,17 @@ import androidx.compose.material.icons.filled.ScreenLockRotation
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
@@ -51,34 +35,25 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.SubcomposeAsyncImage
-import coil.request.ImageRequest
 import com.sus7898.lrrviewer.AppGraph
 import com.sus7898.lrrviewer.ReaderKey
 import com.sus7898.lrrviewer.ReaderKeyEvents
-import com.sus7898.lrrviewer.data.FitMode
 import com.sus7898.lrrviewer.data.ReaderBackground
 import com.sus7898.lrrviewer.data.ReadingMode
 import com.sus7898.lrrviewer.ui.common.ErrorView
 import com.sus7898.lrrviewer.ui.common.findActivity
 import kotlinx.coroutines.flow.MutableSharedFlow
-import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.launch
-import me.saket.telephoto.zoomable.ZoomSpec
-import me.saket.telephoto.zoomable.coil.ZoomableAsyncImage
-import me.saket.telephoto.zoomable.rememberZoomableImageState
-import me.saket.telephoto.zoomable.rememberZoomableState
-import kotlin.math.abs
 import kotlin.math.roundToInt
 
-enum class TapZone { LEFT, RIGHT, TOP, BOTTOM, CENTER }
-
+/** Reader host: system UI, hardware keys, chrome (top/bottom bars), sheets. Page rendering lives in PagedReader / WebtoonReader. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> Unit) {
-    val vm: ReaderViewModel = viewModel(key = "reader_$arcId") { ReaderViewModel(graph, arcId, startPage) }
+    val vm: ReaderViewModel = viewModel(key = "reader_$arcId") { ReaderViewModel(graph.readerDeps, arcId, startPage) }
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by graph.settingsState.collectAsStateWithLifecycle()
+    val readingMode = state.readingModeOverride ?: settings.readingMode
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val view = LocalView.current
@@ -132,8 +107,8 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             return
         }
         val forward = when (zone) {
-            TapZone.LEFT -> settings.readingMode == ReadingMode.RTL
-            TapZone.RIGHT -> settings.readingMode != ReadingMode.RTL
+            TapZone.LEFT -> readingMode == ReadingMode.RTL
+            TapZone.RIGHT -> readingMode != ReadingMode.RTL
             TapZone.TOP -> false
             TapZone.BOTTOM -> true
             TapZone.CENTER -> true
@@ -159,7 +134,7 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                 ErrorView(state.error!!, modifier = Modifier.weight(1f), onRetry = { vm.load() })
                 TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 32.dp)) { Text("돌아가기") }
             }
-            settings.readingMode == ReadingMode.WEBTOON -> WebtoonReader(
+            readingMode == ReadingMode.WEBTOON -> WebtoonReader(
                 pages = state.pages,
                 initialPage = state.currentPage,
                 jumpEvents = jumpEvents,
@@ -169,7 +144,7 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             else -> PagedReader(
                 pages = state.pages,
                 initialPage = state.currentPage,
-                mode = settings.readingMode,
+                mode = readingMode,
                 fitMode = settings.fitMode,
                 jumpEvents = jumpEvents,
                 onPageChanged = vm::onPageChanged,
@@ -201,7 +176,11 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                     Column {
                         Text(state.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.titleMedium)
                         if (state.pageCount > 0) {
-                            Text("${state.currentPage + 1} / ${state.pageCount}", style = MaterialTheme.typography.labelSmall)
+                            Text(
+                                "${state.currentPage + 1} / ${state.pageCount}" +
+                                    (state.readingModeOverride?.let { " · ${it.label} (이 작품)" } ?: ""),
+                                style = MaterialTheme.typography.labelSmall,
+                            )
                         }
                     }
                 },
@@ -235,15 +214,15 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             ReaderBottomBar(
                 currentPage = state.currentPage,
                 pageCount = state.pageCount,
-                mode = settings.readingMode,
+                mode = readingMode,
                 hasToc = state.toc.isNotEmpty(),
                 onJump = { p -> jumpEvents.tryEmit(p.coerceIn(0, state.pageCount - 1)) },
                 onSettings = { showSettings = true },
                 onToc = { showToc = true },
                 onCycleMode = {
+                    // Quick toggle applies to this archive only; the settings sheet changes the global default.
                     val modes = ReadingMode.entries
-                    val next = modes[(modes.indexOf(settings.readingMode) + 1) % modes.size]
-                    scope.launch { graph.settings.edit { it.copy(readingMode = next) } }
+                    vm.setReadingModeOverride(modes[(modes.indexOf(readingMode) + 1) % modes.size])
                 },
             )
         }
@@ -252,7 +231,9 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
     if (showSettings) {
         ReaderSettingsSheet(
             settings = settings,
+            readingModeOverride = state.readingModeOverride,
             onChange = { transform -> scope.launch { graph.settings.edit(transform) } },
+            onOverrideChange = vm::setReadingModeOverride,
             onDismiss = { showSettings = false },
         )
     }
@@ -313,219 +294,10 @@ private fun ReaderBottomBar(
                 Text("$pageCount", modifier = Modifier.widthIn(min = 36.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium)
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                IconButton(onClick = onCycleMode) { Icon(Icons.Filled.SwapHoriz, contentDescription = "읽기 방향 전환: ${mode.label}") }
+                IconButton(onClick = onCycleMode) { Icon(Icons.Filled.SwapHoriz, contentDescription = "이 작품의 읽기 방향 전환: ${mode.label}") }
                 IconButton(onClick = onToc, enabled = hasToc) { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "목차") }
                 IconButton(onClick = onSettings) { Icon(Icons.Filled.Tune, contentDescription = "뷰어 설정") }
             }
-        }
-    }
-}
-
-// ------------------------------------------------------------------------------------------
-// Paged modes (LTR / RTL / vertical)
-// ------------------------------------------------------------------------------------------
-
-@Composable
-private fun PagedReader(
-    pages: List<String>,
-    initialPage: Int,
-    mode: ReadingMode,
-    fitMode: FitMode,
-    jumpEvents: SharedFlow<Int>,
-    onPageChanged: (Int) -> Unit,
-    onTap: (TapZone) -> Unit,
-) {
-    val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))) { pages.size }
-
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }.collect { onPageChanged(it) }
-    }
-    LaunchedEffect(jumpEvents) {
-        jumpEvents.collect { p -> if (p in pages.indices) pagerState.scrollToPage(p) }
-    }
-
-    val contentScale = when (fitMode) {
-        FitMode.FIT -> ContentScale.Fit
-        FitMode.FILL_WIDTH -> ContentScale.FillWidth
-        FitMode.FILL_HEIGHT -> ContentScale.FillHeight
-    }
-    val pageContent: @Composable (Int) -> Unit = { index ->
-        ReaderPage(
-            url = pages[index],
-            contentScale = contentScale,
-            onTap = { offset, size -> onTap(zoneOf(offset, size, vertical = mode == ReadingMode.VERTICAL)) },
-        )
-    }
-
-    if (mode == ReadingMode.VERTICAL) {
-        VerticalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            beyondViewportPageCount = 1,
-            key = { it },
-        ) { pageContent(it) }
-    } else {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            beyondViewportPageCount = 1,
-            reverseLayout = mode == ReadingMode.RTL,
-            key = { it },
-        ) { pageContent(it) }
-    }
-}
-
-@Composable
-private fun ReaderPage(url: String, contentScale: ContentScale, onTap: (Offset, IntSize) -> Unit) {
-    val context = LocalContext.current
-    var retry by remember(url) { mutableIntStateOf(0) }
-    var error by remember(url) { mutableStateOf<String?>(null) }
-    var size by remember { mutableStateOf(IntSize.Zero) }
-
-    val request = remember(url, retry) {
-        ImageRequest.Builder(context)
-            .data(url)
-            .setParameter("retry", retry)
-            .listener(
-                onError = { _, result -> error = result.throwable.message ?: "이미지를 불러오지 못했습니다" },
-                onSuccess = { _, _ -> error = null },
-            )
-            .build()
-    }
-    val zoomableState = rememberZoomableState(zoomSpec = ZoomSpec(maxZoomFactor = 6f))
-    val imageState = rememberZoomableImageState(zoomableState)
-
-    Box(
-        Modifier
-            .fillMaxSize()
-            .onSizeChanged { size = it },
-    ) {
-        ZoomableAsyncImage(
-            model = request,
-            contentDescription = null,
-            modifier = Modifier.fillMaxSize(),
-            state = imageState,
-            contentScale = contentScale,
-            onClick = { offset -> onTap(offset, size) },
-        )
-        if (!imageState.isImageDisplayed && error == null) {
-            CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)
-        }
-        error?.let { message ->
-            Column(
-                Modifier
-                    .align(Alignment.Center)
-                    .padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-            ) {
-                Icon(Icons.Filled.Warning, contentDescription = null, tint = Color.White)
-                Spacer(Modifier.height(8.dp))
-                Text(message, color = Color.White, textAlign = TextAlign.Center, style = MaterialTheme.typography.bodySmall)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { error = null; retry++ }) { Text("다시 시도") }
-            }
-        }
-    }
-}
-
-// ------------------------------------------------------------------------------------------
-// Webtoon (continuous vertical scroll)
-// ------------------------------------------------------------------------------------------
-
-@Composable
-private fun WebtoonReader(
-    pages: List<String>,
-    initialPage: Int,
-    jumpEvents: SharedFlow<Int>,
-    onPageChanged: (Int) -> Unit,
-    onTap: (TapZone) -> Unit,
-) {
-    val listState = rememberLazyListState(initialFirstVisibleItemIndex = initialPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0)))
-    LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }.collect { onPageChanged(it) }
-    }
-    LaunchedEffect(jumpEvents) {
-        jumpEvents.collect { p -> if (p in pages.indices) listState.scrollToItem(p) }
-    }
-
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    val transformState = rememberTransformableState { zoomChange, pan, _ ->
-        scale = (scale * zoomChange).coerceIn(1f, 3f)
-        val maxX = size.width * (scale - 1f) / 2f
-        offsetX = (offsetX + pan.x).coerceIn(-maxX, maxX)
-    }
-
-    Box(
-        Modifier
-            .fillMaxSize()
-            .onSizeChanged { size = it }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { offset -> onTap(zoneOf(offset, size, vertical = true)) },
-                    onDoubleTap = { scale = 1f; offsetX = 0f },
-                )
-            }
-            .transformable(transformState, canPan = { delta -> scale > 1f && abs(delta.x) > abs(delta.y) })
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationX = offsetX
-            },
-    ) {
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-            itemsIndexed(pages, key = { index, _ -> index }) { _, url -> WebtoonPage(url) }
-        }
-    }
-}
-
-@Composable
-private fun WebtoonPage(url: String) {
-    val context = LocalContext.current
-    var retry by remember(url) { mutableIntStateOf(0) }
-    val request = remember(url, retry) {
-        ImageRequest.Builder(context).data(url).setParameter("retry", retry).build()
-    }
-    SubcomposeAsyncImage(
-        model = request,
-        contentDescription = null,
-        contentScale = ContentScale.FillWidth,
-        modifier = Modifier.fillMaxWidth(),
-        loading = {
-            Box(Modifier.fillMaxWidth().aspectRatio(0.7f), contentAlignment = Alignment.Center) {
-                CircularProgressIndicator(color = Color.White)
-            }
-        },
-        error = {
-            Column(
-                Modifier.fillMaxWidth().aspectRatio(0.7f).padding(24.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(Icons.Filled.Warning, contentDescription = null, tint = Color.White)
-                Spacer(Modifier.height(8.dp))
-                Button(onClick = { retry++ }) { Text("다시 시도") }
-            }
-        },
-    )
-}
-
-private fun zoneOf(offset: Offset, size: IntSize, vertical: Boolean): TapZone {
-    if (size.width <= 0 || size.height <= 0) return TapZone.CENTER
-    return if (vertical) {
-        val fy = offset.y / size.height
-        when {
-            fy < 0.28f -> TapZone.TOP
-            fy > 0.72f -> TapZone.BOTTOM
-            else -> TapZone.CENTER
-        }
-    } else {
-        val fx = offset.x / size.width
-        when {
-            fx < 0.3f -> TapZone.LEFT
-            fx > 0.7f -> TapZone.RIGHT
-            else -> TapZone.CENTER
         }
     }
 }

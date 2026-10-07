@@ -105,7 +105,7 @@ fun SettingsScreen(graph: AppGraph) {
     }
 }
 
-@OptIn(coil.annotation.ExperimentalCoilApi::class)
+@OptIn(coil3.annotation.ExperimentalCoilApi::class)
 @Composable
 private fun CacheSection(graph: AppGraph, settings: AppSettings, onCacheSize: (Int) -> Unit) {
     val scope = rememberCoroutineScope()

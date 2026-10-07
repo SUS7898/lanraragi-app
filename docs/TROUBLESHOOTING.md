@@ -111,6 +111,42 @@
   `UnusedAttribute enableOnBackInvokedCallback`(API 33+에서만 의미, 무해).
 - Lint 결과는 이제 작업 로그에 텍스트로 출력된다(`textOutput = File("stdout")`).
 
+## E. 구조 개편(세션 1 후반) 시 확인한 사항 — Room · Coil 3 · 타입 안전 내비게이션
+
+### E-1. 왜 "전면 개편"이 아니라 "선택적 조기 교체"인가 (결정 기록)
+- 단일 모듈 + MVVM + 수동 DI는 이 규모에 적절. 갈아엎으면 비용만 든다.
+- 나중에 바꾸면 비싼 것만 지금 교체: ① 기록 저장소 JSON → **Room**, 키 `(serverId, arcid)`; ② **Coil 2 → 3**;
+  ③ 문자열 라우트 → **타입 안전 라우트**; ④ ViewModel 의존성 축소; ⑤ 리더 파일 분리.
+- 보류: Hilt/Koin, 멀티모듈, strings.xml 분리(BACKLOG P3).
+
+### E-2. KSP 플러그인은 `com.google.*`이지만 google() 저장소에 없다
+- `settings.gradle.kts`의 `pluginManagement { google { content { includeGroupByRegex("com\\.google.*") } } }`가 있으면
+  Gradle이 KSP(`com.google.devtools.ksp`)를 google()에서만 찾다가 실패한다. → 플러그인 저장소의 content filter 제거.
+- KSP 버전은 Kotlin 버전과 접두사가 정확히 같아야 함(`2.1.21-2.0.1`). Maven Central
+  `com/google/devtools/ksp/symbol-processing-gradle-plugin/maven-metadata.xml`로 존재 확인.
+
+### E-3. Room 스키마 JSON은 CI가 커밋하지 않는다
+- `room { schemaDirectory("$projectDir/schemas") }` + `exportSchema = true`. 스키마 파일은 빌드 산출물이라 **로컬 빌드 후
+  `app/schemas/**`를 커밋**해야 다음 버전에서 AutoMigration을 쓸 수 있다. 커밋 전까지는 수동 `Migration`으로 처리.
+- `.gitignore`는 `app/schemas`를 제외하지 않는다(확인).
+
+### E-4. Coil 2 → 3 API 차이 (이 코드베이스에서 실제로 바꾼 것)
+- 패키지 `coil.*` → `coil3.*`. `Application : ImageLoaderFactory` → `SingletonImageLoader.Factory` (`newImageLoader(PlatformContext)`).
+- 네트워크: `ImageLoader.Builder.okHttpClient(...)` 없음 → `.components { add(OkHttpNetworkFetcherFactory(callFactory = { client })) }`
+  (`coil-network-okhttp` 의존성 필요).
+- `respectCacheHeaders(false)` 없음 → Coil 3 기본이 캐시 헤더 무시(원하는 동작). 헤더 존중은 `coil-network-cache-control`.
+- `DiskCache.Builder().directory(okio.Path)` → `File.toOkioPath()`; `MemoryCache.Builder().maxSizePercent(context, 0.25)`(context 인자 이동).
+- `crossfade(false)`는 `coil3.request.crossfade` **확장 함수** import 필요.
+- `ImageRequest.Builder.setParameter` 없음 → `memoryCacheKeyExtra("retry", "n")`. `listener(onError=…)` 람다 오버로드 대신
+  `object : ImageRequest.Listener` 구현으로 안전하게.
+- `Decoder.Factory.create(result: SourceFetchResult, options, imageLoader)`; `DecodeResult(image = drawable.asImage(), isSampled)`
+  (`coil3.asImage`).
+- 어노테이션 `coil3.annotation.ExperimentalCoilApi`. telephoto는 `me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage`.
+
+### E-5. 타입 안전 내비게이션
+- `@Serializable object/data class` 라우트 + `composable<T>`, `entry.toRoute<T>()`, `navigate(Route(...))`,
+  `popUpTo<T>`, `popBackStack<T>(inclusive=false)`. R8: 라우트 클래스의 serializer는 기존 `**$$serializer`/`Companion` keep 규칙에 포함됨.
+
 ## D. 라이브러리 API 함정 (컴파일 전 확인한 가정)
 - **minSdk는 28**: 업데이트 검증에 쓰는 `PackageInfo.signingInfo`, `longVersionCode`, `GET_SIGNING_CERTIFICATES`가
   API 28. minSdk 26이면 Lint `NewApi` 오류로 CI 실패. (Galaxy 2018년 이후 기기 모두 해당)

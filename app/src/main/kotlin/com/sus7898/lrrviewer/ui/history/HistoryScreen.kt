@@ -17,7 +17,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.sus7898.lrrviewer.AppGraph
 import com.sus7898.lrrviewer.ui.common.EmptyView
 import com.sus7898.lrrviewer.ui.common.formatDateTime
@@ -30,7 +30,7 @@ fun HistoryScreen(
     onOpenArchive: (String) -> Unit,
     onOpenReader: (String, Int) -> Unit,
 ) {
-    val entries by graph.history.flow.collectAsStateWithLifecycle(initialValue = emptyList())
+    val entries by graph.progress.recent.collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
     var confirmClear by remember { mutableStateOf(false) }
 
@@ -83,7 +83,7 @@ fun HistoryScreen(
                             )
                         },
                         trailingContent = {
-                            IconButton(onClick = { scope.launch { graph.history.remove(e.arcid) } }) {
+                            IconButton(onClick = { scope.launch { graph.progress.remove(e.arcid) } }) {
                                 Icon(Icons.Filled.Close, contentDescription = "기록 삭제")
                             }
                         },
@@ -104,7 +104,7 @@ fun HistoryScreen(
             title = { Text("기록 전체 삭제") },
             text = { Text("기기에 저장된 읽기 기록을 모두 삭제합니다. 서버의 진행률은 그대로 유지됩니다.") },
             confirmButton = {
-                TextButton(onClick = { scope.launch { graph.history.clear() }; confirmClear = false }) { Text("삭제") }
+                TextButton(onClick = { scope.launch { graph.progress.clear() }; confirmClear = false }) { Text("삭제") }
             },
             dismissButton = { TextButton(onClick = { confirmClear = false }) { Text("취소") } },
         )

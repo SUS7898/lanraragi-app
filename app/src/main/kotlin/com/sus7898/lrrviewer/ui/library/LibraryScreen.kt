@@ -39,7 +39,7 @@ import kotlinx.coroutines.launch
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
-    val vm: LibraryViewModel = viewModel { LibraryViewModel(graph) }
+    val vm: LibraryViewModel = viewModel { LibraryViewModel(graph.api, graph.settingsState) }
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by graph.settingsState.collectAsStateWithLifecycle()
     val pendingSearch by graph.pendingLibrarySearch.collectAsStateWithLifecycle()

@@ -1,10 +1,11 @@
 package com.sus7898.lrrviewer
 
 import android.app.Application
-import coil.ImageLoader
-import coil.ImageLoaderFactory
+import coil3.ImageLoader
+import coil3.PlatformContext
+import coil3.SingletonImageLoader
 
-class App : Application(), ImageLoaderFactory {
+class App : Application(), SingletonImageLoader.Factory {
 
     lateinit var graph: AppGraph
         private set
@@ -14,5 +15,5 @@ class App : Application(), ImageLoaderFactory {
         graph = AppGraph(this)
     }
 
-    override fun newImageLoader(): ImageLoader = graph.imageLoader
+    override fun newImageLoader(context: PlatformContext): ImageLoader = graph.imageLoader
 }

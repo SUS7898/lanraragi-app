@@ -21,20 +21,28 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 개별 디코딩해서 **깨진 항목 하나가 목록 전체를 막지 않게** 한다 (`LrrApi.decodeArchives`).
 회귀 테스트: `ModelsParsingTest`, `LrrApiTest`.
 
-## 3. 아키텍처
-- 단일 모듈 `:app`, Kotlin 2.1 + Jetpack Compose(Material3), 수동 DI(`AppGraph`).
-- 상태: `StateFlow` + `ViewModel`. 설정은 DataStore(Preferences). 읽기 기록은 DataStore에 JSON.
+## 3. 아키텍처 (세션 1 후반 구조 개편 반영)
+- 단일 모듈 `:app`, Kotlin 2.1 + Jetpack Compose(Material3), **수동 DI(`AppGraph`)**.
+  Hilt/Koin·멀티모듈은 이 규모에서 비용만 늘려 **채택하지 않음**(결정). ViewModel은 `AppGraph` 전체가 아니라
+  필요한 의존성만 생성자로 받는다(`LibraryViewModel(api, settings)`, `ReaderViewModel(Deps, …)`) → JVM 테스트 가능.
+- 상태: `StateFlow` + `ViewModel`. 설정은 DataStore(Preferences). **읽기 기록/진행률은 Room**(`data/db/AppDatabase.kt`,
+  `reading_progress` 테이블, PK `(serverId, arcid)`). JSON 블롭 저장은 폐기(릴리스 전이라 마이그레이션 없음).
+- **데이터 식별자**: 모든 로컬 레코드는 `serverId`를 가진다(현재는 상수 `DEFAULT_SERVER_ID`). 서버 프로필 여러 개를
+  지원할 때 스키마 변경 없이 `ReadingProgressRepository(dao, serverId)`만 동적으로 바꾸면 된다.
+  `readingModeOverride` 컬럼 = 작품별 읽기 방향(바텀바 빠른 전환은 "이 작품만", 설정 시트는 기본값).
 - 네트워크: OkHttp 단일 클라이언트. `LrrAuthInterceptor`가 **설정된 서버 호스트에만**
   `Authorization: Bearer base64(apiKey)` 부여(GitHub 등 다른 호스트로 키 유출 방지),
   "평문 HTTP 허용" 설정을 런타임에 강제.
-- 이미지: Coil 2 + telephoto(`ZoomableAsyncImage`, 대형 이미지 서브샘플링/핀치 줌).
-  Coil 디스크 캐시(기본 512MB, 설정 가능)에 페이지를 저장 → 재열람 시 네트워크 0.
-  `respectCacheHeaders(false)`: LRR가 캐시 헤더를 주지 않기 때문.
-- 미리 받기: 다음 N장(기본 3)을 `DiskOnlyDecoder`(디코딩 안 함)로 enqueue → 비트맵 메모리
-  낭비 없이 디스크 캐시만 채움.
-- 내비게이션: Navigation Compose. 라우트 `setup`, `home`(탭: 서재/기록/설정), `archive/{id}`,
-  `reader/{id}?page={page}`.
+- 이미지: **Coil 3**(`coil3-compose` + `coil-network-okhttp`, API용 OkHttp 클라이언트 공유) + telephoto
+  `zoomable-image-coil3`(대형 이미지 서브샘플링/핀치 줌). Coil 3는 기본적으로 HTTP 캐시 헤더를 무시하므로
+  별도 설정 없이 LRR 페이지가 디스크 캐시(기본 512MB)에 남는다. Coil 2는 유지보수 모드라 초기에 이전함(결정).
+- 미리 받기: 다음 N장(기본 3)을 `DiskOnlyDecoder`(디코딩 안 함)로 enqueue → 비트맵 메모리 낭비 없이 디스크 캐시만 채움.
+- 내비게이션: Navigation Compose **타입 안전 라우트**(`@Serializable` `SetupRoute`/`HomeRoute`/`ArchiveRoute(id)`/
+  `ReaderRoute(id, page)`, `ui/AppRoot.kt`). 문자열 라우트 금지.
+- 리더 구성: `ReaderScreen`(호스트·크롬·시스템 UI·키) / `PagedReader`(LTR·RTL·세로, telephoto) /
+  `WebtoonReader`(연속 스크롤) / `ReaderGestures`(탭 존) / `ReaderSettingsSheet`.
 - 하드웨어 볼륨키: `MainActivity.onKeyDown/Up` → `ReaderKeyEvents`(SharedFlow) → 리더.
+- 의도적으로 하지 않은 것: 멀티모듈, DI 프레임워크, `strings.xml` 분리(개인용·한국어 단일; 공개 배포 시 재검토).
 
 ## 4. LANraragi API 메모 (소스 `tools/openapi.yaml`, `Controller/Api/*.pm` 확인)
 | 용도 | 엔드포인트 | 비고 |
@@ -94,9 +102,10 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 
 ## 9. 버전 핀 이유
 클라우드 세션에서 로컬 빌드가 안 되므로 "확실히 존재하고 서로 호환되는" 조합을 고정했다.
-AGP 8.10.1(Gradle ≥ 8.11.1 요구) + Gradle 8.14.3 + Kotlin 2.1.21(Compose 컴파일러 플러그인 동일 버전).
-telephoto `zoomable-image-coil`은 Coil **2.x**용 아티팩트(Coil 3용은 `zoomable-image-coil3`).
-올릴 때는 반드시 CI 통과를 확인하고 `docs/TROUBLESHOOTING.md`에 결과를 남긴다.
+AGP 8.10.1(Gradle ≥ 8.11.1 요구) + Gradle 8.14.3 + Kotlin 2.1.21(Compose 컴파일러 플러그인 동일 버전)
++ KSP **2.1.21-2.0.1**(Kotlin 버전과 접두사가 정확히 일치해야 함) + Room 2.7.1(KSP2 지원).
+Coil **3.2.0**: telephoto 0.16.0의 `zoomable-image-coil3` POM이 coil-compose 3.2.0 · Kotlin 2.1.21 · Compose 1.8.0에
+의존함을 Maven Central에서 확인하고 맞춤. 올릴 때는 반드시 CI 통과를 확인하고 `docs/TROUBLESHOOTING.md`에 결과를 남긴다.
 
 ## 10. 보류/미구현 (아이디어)
 - 오프라인 다운로드(아카이브 통째 저장) — 요구사항이 스트리밍이라 제외. 캐시가 대체.

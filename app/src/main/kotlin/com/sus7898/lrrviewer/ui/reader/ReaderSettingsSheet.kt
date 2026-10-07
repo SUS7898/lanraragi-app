@@ -20,7 +20,9 @@ import com.sus7898.lrrviewer.ui.common.SwitchRow
 @Composable
 fun ReaderSettingsSheet(
     settings: AppSettings,
+    readingModeOverride: ReadingMode?,
     onChange: ((AppSettings) -> AppSettings) -> Unit,
+    onOverrideChange: (ReadingMode?) -> Unit,
     onDismiss: () -> Unit,
 ) {
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -34,7 +36,13 @@ fun ReaderSettingsSheet(
         ) {
             Text("뷰어 설정", style = MaterialTheme.typography.titleLarge)
 
-            ChoiceChips("읽기 방향", ReadingMode.entries, settings.readingMode, { it.label }) { v -> onChange { it.copy(readingMode = v) } }
+            ChoiceChips("읽기 방향 (기본값)", ReadingMode.entries, settings.readingMode, { it.label }) { v -> onChange { it.copy(readingMode = v) } }
+            ChoiceChips(
+                "이 작품만",
+                listOf<ReadingMode?>(null) + ReadingMode.entries,
+                readingModeOverride,
+                { it?.label ?: "기본값 따름" },
+            ) { v -> onOverrideChange(v) }
             ChoiceChips("이미지 맞춤", FitMode.entries, settings.fitMode, { it.label }) { v -> onChange { it.copy(fitMode = v) } }
             ChoiceChips("배경", ReaderBackground.entries, settings.background, { it.label }) { v -> onChange { it.copy(background = v) } }
 

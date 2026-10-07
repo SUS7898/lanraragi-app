@@ -21,7 +21,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
-import coil.compose.AsyncImage
+import coil3.compose.AsyncImage
 import com.sus7898.lrrviewer.AppGraph
 import com.sus7898.lrrviewer.data.api.Archive
 import com.sus7898.lrrviewer.data.api.Tag
@@ -44,7 +44,7 @@ fun ArchiveDetailScreen(
     onOpenArchive: (String) -> Unit,
     onSearchTag: (String) -> Unit,
 ) {
-    val vm: ArchiveDetailViewModel = viewModel(key = "detail_$id") { ArchiveDetailViewModel(graph, id) }
+    val vm: ArchiveDetailViewModel = viewModel(key = "detail_$id") { ArchiveDetailViewModel(graph.api, graph.progress, id) }
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current

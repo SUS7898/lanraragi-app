@@ -62,12 +62,10 @@
 - 관련: `ReaderScreen.kt`, `AppSettings`(spread 모드/표지 단독 설정), `ReaderSettingsSheet`.
 - 난이도: 중. 이미지 치수 선조회(P0-4와 공유) 필요.
 
-### P1-2. 읽기 방향 자동 감지 + 아카이브별 기억
-- 왜: 만화(RTL)와 웹툰(연속 스크롤)이 한 서버에 섞여 있으면 매번 바꿔야 한다.
-- 어떻게: 첫 페이지 치수를 읽어 세로/가로 비율 > 2.5면 웹툰 모드 제안(스낵바 "웹툰 모드로 볼까요?").
-  `HistoryEntry`에 `readingModeOverride: ReadingMode?` 추가 → 리더 진입 시 우선 적용. 바텀바에서 방향을
-  바꾸면 "이 작품만/기본값으로" 선택.
-- 난이도: 하~중.
+### P1-2. 읽기 방향 자동 감지 (아카이브별 기억은 구현됨)
+- 구현됨: `reading_progress.readingModeOverride` 컬럼, 바텀바 빠른 전환 = 이 작품만, 설정 시트에 "이 작품만/기본값" 선택.
+- 남은 것: 첫 페이지 치수를 읽어 세로/가로 비율 > 2.5면 웹툰 모드 제안(스낵바 "웹툰 모드로 볼까요?").
+- 난이도: 하.
 
 ### P1-3. 밝기 · 색 필터(야간/세피아/흑백) · 블루라이트
 - 어떻게: 리더 설정 시트에 밝기 슬라이더(`window.attributes.screenBrightness` 0.01~1, -1=시스템),
@@ -114,8 +112,10 @@
 
 ### P1-10. 서버 여러 대(프로필)
 - 왜: 집(LAN http) / 외부(Tailscale https) 주소가 다른 경우.
-- 어떻게: `AppSettings.servers: List<ServerProfile(name,url,apiKeyEnc)>` + `activeServerId`. 인터셉터·API는
-  활성 프로필만 본다. 캐시 키는 URL 기반이라 서버마다 분리됨. 단순 대안: "주소 2개 중 연결되는 쪽 자동 선택".
+- 준비됨: Room의 모든 레코드가 `serverId`를 가진다(`DEFAULT_SERVER_ID`). 프로필 테이블(`server_profile`) 추가 +
+  `ReadingProgressRepository(dao, serverId)`의 serverId를 활성 프로필로 바꾸면 기록이 서버별로 분리된다.
+- 어떻게: `AppSettings.activeServerId`, 인터셉터·API는 활성 프로필만 본다. 같은 서버의 LAN/원격 주소 2개는
+  **하나의 프로필에 URL 2개**로 두고 연결되는 쪽을 자동 선택(기록 공유).
 - 난이도: 중.
 
 ### P1-11. 자동 재시도 · 네트워크 변화 대응
@@ -186,7 +186,13 @@
 - **탄코본 진행률**: `PUT /api/tankoubons/{id}/progress/{page}` 지원(묶음 단위 이어 읽기).
 - **서버 "최근 읽음" 탭**: `sortby=lastread`(서버 진행률 추적 켜진 경우)로 다른 기기에서 읽은 것도 표시.
 
+## 구조 개편으로 처리된 것 (세션 1 후반)
+- [x] 기록 저장소 Room 전환 + `(serverId, arcid)` 식별자 — P1-10/P1-2/북마크 등의 기반
+- [x] Coil 3 이전(`coil3-compose`, `coil-network-okhttp`, telephoto coil3)
+- [x] 타입 안전 내비게이션, ViewModel 의존성 축소(테스트 가능), 리더 파일 분리
+
 ## 하지 않기로 한 것 (명시적 보류 — 다시 논의 전까지 유지)
 - Google Play 배포, 광고/텔레메트리/외부 크래시 리포팅(개인정보·단순성).
 - 아카이브 전체 다운로드 기본값(요구사항이 스트리밍).
 - Mihon 확장 포크(원인은 확인했지만 이 앱으로 대체하는 것이 목표).
+- Hilt/Koin 도입, 멀티모듈 분리(현 규모에서 이득 없음). ViewModel 생성자 주입 + `AppGraph`로 충분.

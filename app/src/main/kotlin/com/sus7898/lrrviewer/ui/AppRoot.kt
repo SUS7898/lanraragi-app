@@ -19,11 +19,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
+import androidx.navigation.toRoute
 import com.sus7898.lrrviewer.AppGraph
 import com.sus7898.lrrviewer.data.AppSettings
 import com.sus7898.lrrviewer.ui.common.rememberResumeTick
@@ -33,65 +32,50 @@ import com.sus7898.lrrviewer.ui.reader.ReaderScreen
 import com.sus7898.lrrviewer.ui.settings.ServerSetupScreen
 import com.sus7898.lrrviewer.update.UpdateManager
 import kotlinx.coroutines.delay
+import kotlinx.serialization.Serializable
 
-object Routes {
-    const val SETUP = "setup"
-    const val HOME = "home"
-    const val ARCHIVE = "archive/{id}"
-    const val READER = "reader/{id}?page={page}"
-
-    fun archive(id: String) = "archive/$id"
-    fun reader(id: String, page: Int = -1) = "reader/$id?page=$page"
-}
+// Type-safe routes (Navigation Compose 2.8+). Add new screens here, never as string routes.
+@Serializable object SetupRoute
+@Serializable object HomeRoute
+@Serializable data class ArchiveRoute(val id: String)
+@Serializable data class ReaderRoute(val id: String, val page: Int = -1)
 
 @Composable
 fun AppRoot(graph: AppGraph, settings: AppSettings) {
     val navController = rememberNavController()
-    val startDestination = remember { if (settings.isServerConfigured) Routes.HOME else Routes.SETUP }
+    val startDestination: Any = remember { if (settings.isServerConfigured) HomeRoute else SetupRoute }
 
     NavHost(navController = navController, startDestination = startDestination) {
-        composable(Routes.SETUP) {
+        composable<SetupRoute> {
             ServerSetupScreen(
                 graph = graph,
-                onDone = {
-                    navController.navigate(Routes.HOME) { popUpTo(Routes.SETUP) { inclusive = true } }
-                },
+                onDone = { navController.navigate(HomeRoute) { popUpTo<SetupRoute> { inclusive = true } } },
             )
         }
-        composable(Routes.HOME) {
+        composable<HomeRoute> {
             HomeScreen(
                 graph = graph,
-                onOpenArchive = { id -> navController.navigate(Routes.archive(id)) },
-                onOpenReader = { id, page -> navController.navigate(Routes.reader(id, page)) },
+                onOpenArchive = { id -> navController.navigate(ArchiveRoute(id)) },
+                onOpenReader = { id, page -> navController.navigate(ReaderRoute(id, page)) },
             )
         }
-        composable(
-            Routes.ARCHIVE,
-            arguments = listOf(navArgument("id") { type = NavType.StringType }),
-        ) { entry ->
-            val id = entry.arguments?.getString("id").orEmpty()
+        composable<ArchiveRoute> { entry ->
+            val route = entry.toRoute<ArchiveRoute>()
             ArchiveDetailScreen(
                 graph = graph,
-                id = id,
+                id = route.id,
                 onBack = { navController.popBackStack() },
-                onOpenReader = { page -> navController.navigate(Routes.reader(id, page)) },
-                onOpenArchive = { other -> navController.navigate(Routes.archive(other)) },
+                onOpenReader = { page -> navController.navigate(ReaderRoute(route.id, page)) },
+                onOpenArchive = { other -> navController.navigate(ArchiveRoute(other)) },
                 onSearchTag = { tag ->
                     graph.pendingLibrarySearch.value = tag
-                    navController.popBackStack(Routes.HOME, inclusive = false)
+                    navController.popBackStack<HomeRoute>(inclusive = false)
                 },
             )
         }
-        composable(
-            Routes.READER,
-            arguments = listOf(
-                navArgument("id") { type = NavType.StringType },
-                navArgument("page") { type = NavType.IntType; defaultValue = -1 },
-            ),
-        ) { entry ->
-            val id = entry.arguments?.getString("id").orEmpty()
-            val page = entry.arguments?.getInt("page") ?: -1
-            ReaderScreen(graph = graph, arcId = id, startPage = page, onBack = { navController.popBackStack() })
+        composable<ReaderRoute> { entry ->
+            val route = entry.toRoute<ReaderRoute>()
+            ReaderScreen(graph = graph, arcId = route.id, startPage = route.page, onBack = { navController.popBackStack() })
         }
     }
 

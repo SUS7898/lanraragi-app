@@ -1,6 +1,6 @@
 # 진행 상황 (PROGRESS)
 
-마지막 갱신: 2026-10-07 (세션 1) — 코드 완성, CI/보안 스캔 녹색. 다음은 사용자 작업(키스토어·Secrets) 후 첫 릴리스.
+마지막 갱신: 2026-10-07 (세션 1) — 코드 완성 + 구조 개편(Room/Coil 3/타입 안전 라우트). CI 재검증 후 사용자 작업(키스토어·Secrets) → 첫 릴리스.
 
 ## 상태 요약
 - [x] 요구사항 분석, Mihon 오류 원인 확인, LANraragi API 소스 확인
@@ -24,6 +24,8 @@
 3. `docs/BACKLOG.md` P0 항목(Galaxy 자동 차단 안내, 웹툰 스트립 처리)부터 착수. 그 다음 P1.
 
 - [x] 개선 백로그 검토·정리 (`docs/BACKLOG.md`), 실기기 테스트 체크리스트 (`docs/TEST_CHECKLIST.md`)
+- [x] 구조 개편(조기 교체): Room 기록 저장소(`serverId`+`arcid`), Coil 3, 타입 안전 라우트, ViewModel 의존성 축소, 리더 파일 분리 — DESIGN §3/§9, TROUBLESHOOTING §E
+- [ ] 구조 개편 커밋의 CI/Security Scan 통과 확인 (대기)
 
 ## 검증 이력
 | 날짜 | 무엇을 | 결과 |
