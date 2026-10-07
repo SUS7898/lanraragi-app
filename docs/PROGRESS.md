@@ -1,6 +1,6 @@
 # 진행 상황 (PROGRESS)
 
-마지막 갱신: 2026-10-07 (세션 1) — 코드 완성 + 구조 개편(Room/Coil 3/타입 안전 라우트). CI 재검증 후 사용자 작업(키스토어·Secrets) → 첫 릴리스.
+마지막 갱신: 2026-10-07 (세션 1) — 코드 완성 + 구조 개편(Room/Coil 3/타입 안전 라우트) CI 녹색. 다음은 사용자 작업(키스토어·Secrets) → 첫 릴리스 → 실기기 테스트.
 
 ## 상태 요약
 - [x] 요구사항 분석, Mihon 오류 원인 확인, LANraragi API 소스 확인
@@ -25,7 +25,7 @@
 
 - [x] 개선 백로그 검토·정리 (`docs/BACKLOG.md`), 실기기 테스트 체크리스트 (`docs/TEST_CHECKLIST.md`)
 - [x] 구조 개편(조기 교체): Room 기록 저장소(`serverId`+`arcid`), Coil 3, 타입 안전 라우트, ViewModel 의존성 축소, 리더 파일 분리 — DESIGN §3/§9, TROUBLESHOOTING §E
-- [ ] 구조 개편 커밋의 CI/Security Scan 통과 확인 (대기)
+- [x] 구조 개편 커밋의 CI/Security Scan 통과 확인 (run 37589754882 / 37589754810, 첫 시도에 전부 성공)
 
 ## 검증 이력
 | 날짜 | 무엇을 | 결과 |
@@ -36,3 +36,4 @@
 | 2026-10-07 | CI run 37569641719 + Security Scan run 37569641741 (커밋 a4412e2) | ✅ 전부 성공 |
 | 2026-10-07 | CI run 37570391069 + Security Scan run 37570391094 (커밋 53e882a, 태스크 하이재킹 수정 후) | ✅ 전부 성공 |
 | 2026-10-07 | CI run 37571175724 + Security Scan run 37571175711 (커밋 0658f85) | ✅ 전부 성공, mobsfscan ERROR 0(로컬 검증), Lint 0 errors/19 warnings → C-9로 정리 |
+| 2026-10-07 | CI run 37589754882 + Security Scan run 37589754810 (커밋 15b4031, 구조 개편: Room/Coil 3/타입 안전 라우트) | ✅ 전부 성공 |
