@@ -48,3 +48,5 @@
 | 2026-10-07 | Release run 37618539572 (workflow_dispatch, main ff 후) | ❌ 서명 빌드·Trivy 통과, `Verify APK signature`의 v2 grep 오탐 → C-10으로 수정 |
 | 2026-10-07 | Release run 37619492446 (workflow_dispatch, 커밋 7b372f5의 워크플로로 태그 v0.1.0 빌드) | ✅ 서명 APK·SHA256SUMS·SIGNING-CERT·idsig·mapping 게시 |
 | 2026-10-07 | 로컬 빌드 v0.1.1 작업분 (`.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`) | ✅ 39 tests, Lint 0 errors/13 warnings(버전 핀), app-debug.apk |
+| 2026-10-07 | CI run 37625351034 + Security Scan run 37625350998 (커밋 ae5aa53, v0.1.1 작업분) | ✅ 전부 성공 |
+| 2026-10-07 | Release run 37626031611 (태그 v0.1.1) | ✅ lrr-viewer-v0.1.1.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 → 앱 내 업데이트로 설치 가능 |
