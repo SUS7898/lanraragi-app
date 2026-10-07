@@ -110,6 +110,8 @@
   `GradleDependency`/`AndroidGradlePluginVersion`(버전 핀 정책, Dependabot PR로 관리), `OldTargetApi`(compileSdk 35 핀),
   `UnusedAttribute enableOnBackInvokedCallback`(API 33+에서만 의미, 무해).
 - Lint 결과는 이제 작업 로그에 텍스트로 출력된다(`textOutput = File("stdout")`).
+- 추가(구조 개편 후 16 warnings): `DataExtractionRules`가 "minSdk 28이면 `fullBackupContent`도 지정" → `xml/backup_rules.xml` 추가.
+  남은 경고는 전부 의도된 것(버전 핀, OldTargetApi, enableOnBackInvokedCallback).
 
 ## E. 구조 개편(세션 1 후반) 시 확인한 사항 — Room · Coil 3 · 타입 안전 내비게이션
 
