@@ -39,3 +39,4 @@
 | 2026-10-07 | CI run 37571175724 + Security Scan run 37571175711 (커밋 0658f85) | ✅ 전부 성공, mobsfscan ERROR 0(로컬 검증), Lint 0 errors/19 warnings → C-9로 정리 |
 | 2026-10-07 | CI run 37589754882 + Security Scan run 37589754810 (커밋 15b4031, 구조 개편: Room/Coil 3/타입 안전 라우트) | ✅ 전부 성공 |
 | 2026-10-07 | 로컬 PC 첫 빌드 (`.\gradlew.bat :app:testDebugUnitTest :app:assembleDebug`, Windows 11/JDK 17) | ✅ 23 tests 통과, app-debug.apk 생성 — §F-1~F-3 해결 후 |
+| 2026-10-07 | CI run 37615134952 + Security Scan run 37615134928 (커밋 ce74b24, 로컬 환경 정리·LrrApiTest 호스트 수정·Room 스키마 커밋) | ✅ 전부 성공 |

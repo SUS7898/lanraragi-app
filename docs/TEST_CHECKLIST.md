@@ -70,6 +70,8 @@
 - [ ] (Galaxy) 자동 차단 켠 상태에서 설치 시도 → 어떤 오류가 나는지 기록 → `BACKLOG P0-3` 문구 반영
 
 ## 9. 네트워크 변형
+- [ ] Synology 역방향 프록시(443, HTTPS, Let's Encrypt) — 주소를 `https://도메인`(포트 없이)으로 입력, 연결 테스트·썸네일·페이지 로드 정상;
+      "평문 HTTP 허용"을 끈 상태에서도 동작(이 서버는 https만 쓰므로)
 - [ ] 리버스 프록시 하위 경로(`https://nas.example.com/lrr`) 서버 — 썸네일/페이지 URL 정상
 - [ ] 자체 서명 HTTPS + 기기에 CA 설치 → 연결 성공; CA 없이 → TLS 오류 메시지
 - [ ] Wi-Fi ↔ 모바일 데이터 전환 중 읽기(VPN/Tailscale 포함)
