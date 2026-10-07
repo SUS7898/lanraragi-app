@@ -7,3 +7,7 @@ ignore-rules:
   # A NAS with a self-signed HTTPS certificate only works if the user-installed CA is trusted.
   # The user must deliberately install that CA on the device.
   - android_manifest_base_config_trust_user_certs
+  # False positive: mobsfscan assumes targetSdk 26 when the manifest has no <uses-sdk> (AGP injects it
+  # from build.gradle.kts where targetSdk = 35). The rule only applies to targetSdk < 29, and the
+  # activity already sets taskAffinity="".
+  - android_task_hijacking2

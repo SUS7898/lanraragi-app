@@ -94,6 +94,15 @@
 - Lint 텍스트 리포트: `textOutput = file("stdout")`는 `app/stdout` **파일**로 써진다(프로젝트 상대경로로 해석).
   콘솔 출력은 `textOutput = File("stdout")`(java.io.File, 경로 문자열이 정확히 "stdout")이어야 한다.
 
+### C-8. mobsfscan `.mobsf` 무시 설정이 적용되지 않음 / `task_hijacking2` 오탐
+- 증상: `.mobsf`를 저장소 루트에 두었는데 CI에서 여전히 cleartext/user-certs ERROR. `task_hijacking1`은 사라졌으나 `2`는 남음.
+- 원인 1: mobsfscan은 **스캔 대상 경로**(`app/src/main`)에서 `.mobsf`를 찾는다 → `-c .mobsf`로 명시해야 함.
+- 원인 2: `manifest.py` `TaskHijackingChecks`가 `<uses-sdk>`가 없으면 targetSdk=26으로 가정 → `targetSdk < 29 && exported`로 오탐.
+  AGP가 Gradle의 targetSdk 35를 병합하므로 소스 매니페스트에는 `<uses-sdk>`가 없다.
+- 해결: 워크플로에 `-c .mobsf` 추가, `.mobsf`에 `android_task_hijacking2` 무시(근거 주석). 로컬 검증은
+  `python3 -m venv v && v/bin/pip install mobsfscan && v/bin/mobsfscan -c .mobsf --json -o out.json app/src/main`
+  (pypi는 세션에서 접근 가능 → **mobsfscan은 로컬에서 돌릴 수 있는 유일한 검사기**).
+
 ## D. 라이브러리 API 함정 (컴파일 전 확인한 가정)
 - **minSdk는 28**: 업데이트 검증에 쓰는 `PackageInfo.signingInfo`, `longVersionCode`, `GET_SIGNING_CERTIFICATES`가
   API 28. minSdk 26이면 Lint `NewApi` 오류로 CI 실패. (Galaxy 2018년 이후 기기 모두 해당)
