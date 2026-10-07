@@ -129,7 +129,7 @@ android {
         xmlReport = false
         // Also print findings to the console so they are visible in CI logs without downloading artifacts.
         textReport = true
-        textOutput = file("stdout")
+        textOutput = File("stdout")
         abortOnError = true
         warningsAsErrors = false
         checkReleaseBuilds = true

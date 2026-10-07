@@ -30,3 +30,4 @@
 | 2026-10-07 | CI run 37568970519 (커밋 96b5e8a) | ✅ 테스트·린트·디버그 APK 성공 |
 | 2026-10-07 | Security Scan run 37568970490 | CodeQL/Lint/gitleaks/mobsfscan ✅, Trivy ❌(빌드 도구 netty 오탐 → C-3로 수정) |
 | 2026-10-07 | CI run 37569641719 + Security Scan run 37569641741 (커밋 a4412e2) | ✅ 전부 성공 |
+| 2026-10-07 | CI run 37570391069 + Security Scan run 37570391094 (커밋 53e882a, 태스크 하이재킹 수정 후) | ✅ 전부 성공, mobsfscan ERROR 0 |

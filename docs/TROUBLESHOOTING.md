@@ -88,6 +88,12 @@
 - INFO 6건(인증서 투명성, 루트 탐지, SSL 피닝, 탭재킹, 스크린샷 방지, SafetyNet): 개인용 뷰어에 해당 없음.
 - 참고: mobsfscan 결과는 아티팩트 대신 **작업 로그**(job id)에서 RULE ID/SEVERITY 표를 파싱해 읽었다(B-3).
 
+### C-7. 네 번째 실행 (커밋 53e882a): CI·Security Scan 전부 성공, 컴파일 경고 정리
+- 경고: `Icons.Filled.Sort`/`MenuBook` deprecated → `Icons.AutoMirrored.Filled.*`; Coil `diskCache.size/clear()`는
+  `@OptIn(ExperimentalCoilApi::class)` 필요. 모두 정리.
+- Lint 텍스트 리포트: `textOutput = file("stdout")`는 `app/stdout` **파일**로 써진다(프로젝트 상대경로로 해석).
+  콘솔 출력은 `textOutput = File("stdout")`(java.io.File, 경로 문자열이 정확히 "stdout")이어야 한다.
+
 ## D. 라이브러리 API 함정 (컴파일 전 확인한 가정)
 - **minSdk는 28**: 업데이트 검증에 쓰는 `PackageInfo.signingInfo`, `longVersionCode`, `GET_SIGNING_CERTIFICATES`가
   API 28. minSdk 26이면 Lint `NewApi` 오류로 CI 실패. (Galaxy 2018년 이후 기기 모두 해당)

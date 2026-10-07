@@ -16,7 +16,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
-import androidx.compose.material.icons.filled.Sort
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material3.*
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
@@ -186,7 +186,7 @@ private fun FilterRow(state: LibraryViewModel.UiState, onQuery: (SearchQuery) ->
             AssistChip(
                 onClick = { sortMenu = true },
                 label = { Text(sortLabel + if (q.order == "desc") " ↓" else " ↑") },
-                leadingIcon = { Icon(Icons.Filled.Sort, contentDescription = null, Modifier.size(18.dp)) },
+                leadingIcon = { Icon(Icons.AutoMirrored.Filled.Sort, contentDescription = null, Modifier.size(18.dp)) },
             )
             DropdownMenu(expanded = sortMenu, onDismissRequest = { sortMenu = false }) {
                 SearchQuery.SORT_OPTIONS.forEach { (key, label) ->
