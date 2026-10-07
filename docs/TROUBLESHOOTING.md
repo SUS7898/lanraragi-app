@@ -48,6 +48,11 @@
 - 회피: `raw.githubusercontent.com` 직접 fetch 또는 `git clone --filter=blob:none --sparse`는 가능.
   LANraragi 소스는 이렇게 받아 `tools/openapi.yaml`, `Controller/Api/*.pm`, `Model/Reader.pm`을 확인했다.
 
+### B-3. GitHub Actions 아티팩트 다운로드 불가 (blob.core.windows.net 403)
+- 아티팩트 zip은 `productionresultssa*.blob.core.windows.net`에서 내려받는데 세션 egress 정책이 차단.
+- 회피: 결과를 **작업 로그**로 읽는다. mobsfscan은 콘솔에 표를 찍고, Android Lint는 `textReport = true` +
+  `textOutput = file("stdout")`로 콘솔 출력하도록 설정함. 로그는 `mcp__github__get_job_logs`(job_id)로 조회.
+
 ## C. 빌드 / CI
 
 ### C-1. 첫 CI 실행 (커밋 40fdd7a, 2026-10-07)
