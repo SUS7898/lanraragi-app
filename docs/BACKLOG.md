@@ -32,7 +32,7 @@
   `STATUS_FAILURE_BLOCKED`면 "Galaxy 자동 차단 또는 기기 정책이 설치를 막았습니다" 안내).
 - 난이도: 하.
 
-### P0-4. 웹툰 모드 초대형 세로 이미지(스트립) 처리
+### ✅ P0-4. 웹툰 모드 초대형 세로 이미지(스트립) 처리 — v0.1.2: 2단계(BitmapRegionDecoder 타일링) 구현
 - 왜: 웹툰식 아카이브는 한 장이 800×20000px 같은 세로 스트립인 경우가 많다. 현재 웹툰 모드는
   `SubcomposeAsyncImage(fillMaxWidth)`로 **원본 크기 비트맵**을 만들 수 있어(높이 무제한) GPU 텍스처 한계
   (기기별 4096~16384px)나 메모리 한계를 넘으면 빈 화면/"Bitmap too large"/OOM이 난다.
@@ -62,7 +62,7 @@
 - 관련: `ReaderScreen.kt`, `AppSettings`(spread 모드/표지 단독 설정), `ReaderSettingsSheet`.
 - 난이도: 중. 이미지 치수 선조회(P0-4와 공유) 필요.
 
-### P1-2. 읽기 방향 자동 감지 (아카이브별 기억은 구현됨)
+### ✅ P1-2. 읽기 방향 자동 감지 (아카이브별 기억은 구현됨) — v0.1.2: 시작 페이지 비율 ≥ 2.5면 웹툰 모드 제안 스낵바
 - 구현됨: `reading_progress.readingModeOverride` 컬럼, 바텀바 빠른 전환 = 이 작품만, 설정 시트에 "이 작품만/기본값" 선택.
 - 남은 것: 첫 페이지 치수를 읽어 세로/가로 비율 > 2.5면 웹툰 모드 제안(스낵바 "웹툰 모드로 볼까요?").
 - 난이도: 하.
@@ -191,7 +191,7 @@
 **전면 개편 판단: 불필요.** 단일 모듈·수동 DI·MVVM·Room·Coil 3·타입 안전 라우트는 이 규모(4.5k줄)에 맞고, 나중에
 비싼 것(저장소 스키마·이미지 스택·라우트)은 세션 1에서 이미 교체했다. 기능이 쌓이기 **전에** 모양을 정해 둘 것은 아래 S-1·S-2 둘뿐.
 
-### S-1. 페이지 치수(width/height) 캐시 — P0-4·P1-1·P1-2가 공유하는 기반 (구조, 중)
+### ✅ S-1. 페이지 치수(width/height) 캐시 — P0-4·P1-1·P1-2가 공유하는 기반 (구조, 중) — v0.1.2: Room `page_info` + `PageImageStore`
 - 왜: 웹툰 스트립 타일링(P0-4), 양면 보기(P1-1), 웹툰 자동 감지(P1-2)가 전부 "레이아웃 전에 이미지 크기를 알아야" 한다.
   셋을 따로 구현하면 치수 조회 코드가 세 벌 생긴다.
 - 어떻게: `data/PageInfoRepository`(Room `page_info(serverId, arcid, index, width, height)`) + Coil 디스크 캐시 스냅샷에서
@@ -206,7 +206,7 @@
 - `ReaderScreen.onZoneTap` → `jumpEvents` → `WebtoonReader`의 `scrollToItem(p)`. 긴 스트립에서는 한 탭에 화면 몇 개분이 튄다.
 - 수정: 웹툰 모드에서는 `listState.animateScrollBy(±viewportHeight * 0.9f)`. 볼륨키도 동일.
 
-### S-4. 웹툰 줌이 `graphicsLayer` 스케일이라 레이아웃과 분리 (P0-4와 함께, 중)
+### S-4. 웹툰 줌이 `graphicsLayer` 스케일이라 레이아웃과 분리 (중) — v0.1.2 타일링 후에도 그대로(독립 작업)
 - 확대 상태에서 탭 좌표·스크롤 범위가 실제 콘텐츠와 어긋난다. 타일링 재설계 때 `Modifier.zoomable`(telephoto) 또는
   항목 폭을 실제로 키우는 방식으로 바꾼다.
 

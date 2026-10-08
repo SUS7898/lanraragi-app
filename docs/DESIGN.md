@@ -55,6 +55,14 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
   좌우 30%/가운데 40%로 나누고, 이미지 밖 여백은 가까운 가장자리로 친다. 웹툰 모드의 탭/키는 항목 점프가 아니라 뷰포트 90% 스크롤.
 - **뒤로 가기 계층**: 리더/상세 → pop, 기록/설정 탭 → 서재 탭, 서재에 검색·필터가 있으면 → 초기화, 그 다음에야 앱 종료(`BackHandler`).
 - **크래시 로그**: `CrashLog`가 `files/crash/last-crash.txt`에 마지막 미처리 예외를 남기고 설정 → 정보에서 보기/공유/삭제. 외부 전송 없음.
+- **페이지 치수 캐시(S-1)**: Room `page_info(serverId, arcid, pageIndex, width, height)` ← `PageInfoRepository` ← `PageImageStore.bounds()`
+  (`inJustDecodeBounds`). `PageImageStore`는 모든 페이지 파일을 **Coil 디스크 캐시**(키 = 페이지 URL)에서 꺼내 쓰므로 치수 읽기·타일
+  디코딩이 이미지를 두 번 내려받지 않는다. 치수는 필요한 페이지만(보이는 행 + 다음 2행, 시작 페이지) 게으르게 읽는다 — 전체를
+  미리 읽으면 스트리밍 요구와 어긋난다(결정).
+- **웹툰 타일링(P0-4 2단계)**: `buildWebtoonItems`가 페이지를 행으로 바꾼다. 크기 모름 → `Pending`(자리표시), 높이 ≤ 2048px →
+  `Whole`(Coil이 컴포저블 크기로 디코딩, 실제 종횡비로 레이아웃), 그 이상 → ≤2048px `Tile` 여러 개를 `BitmapRegionDecoder`로
+  화면 너비에 맞는 `inSampleSize`로 디코딩(소형 LRU). 행 key는 `page_tileIndex`라 Pending→Whole/Tile 0 전환에도 스크롤 앵커가 유지된다.
+- **웹툰 모드 제안(P1-2)**: 시작 페이지의 높이가 너비의 2.5배 이상이고 작품별 모드가 없으면 스낵바로 "웹툰 모드로 볼까요?"(작품별 override).
 - 의도적으로 하지 않은 것: 멀티모듈, DI 프레임워크, `strings.xml` 분리(개인용·한국어 단일; 공개 배포 시 재검토).
 
 ## 4. LANraragi API 메모 (소스 `tools/openapi.yaml`, `Controller/Api/*.pm` 확인)
@@ -89,6 +97,7 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 정렬 추가일/제목/최근 읽음/평점/작가/시리즈/그룹 + 임의 네임스페이스 입력 · 즐겨찾기 칩(북마크 카테고리) · 평점 N점 이상 칩 ·
 카드에 ♥/★N 배지 · 상세 화면 하트 토글 + 별 5개 · 카테고리 정렬 모드와 드래그 순서 편집 화면 · 키보드 페이지 키 ·
 펀치홀 컷아웃 영역까지 그리기 · 뒤로 가기 계층 · 서버 응답 오류로 건너뛴 항목 수 표시.
+v0.1.2: 페이지 치수 캐시 · 웹툰 세로 스트립 타일링(2048px 밴드, 영역 디코딩) · 실제 종횡비 레이아웃 · 웹툰 모드 제안 스낵바.
 
 ## 6. 자체 업데이트 설계
 1. `GET https://api.github.com/repos/{owner}/{repo}/releases/latest` (하루 1회 자동 + 수동).

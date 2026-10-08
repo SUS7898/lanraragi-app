@@ -49,6 +49,9 @@ import kotlin.math.roundToInt
 /** Fraction of the viewport a tap / key scrolls in webtoon mode. */
 private const val WEBTOON_SCROLL_FRACTION = 0.9f
 
+/** A page at least this many times taller than wide is treated as a webtoon strip (mode suggestion). */
+private const val WEBTOON_SUGGEST_RATIO = 2.5f
+
 /** Reader host: system UI, hardware keys, chrome (top/bottom bars), sheets. Page rendering lives in PagedReader / WebtoonReader. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -61,11 +64,13 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
     val activity = remember(context) { context.findActivity() }
     val view = LocalView.current
     val scope = rememberCoroutineScope()
+    val snackbar = remember { SnackbarHostState() }
 
     var chromeVisible by rememberSaveable { mutableStateOf(true) }
     var showSettings by remember { mutableStateOf(false) }
     var showToc by remember { mutableStateOf(false) }
     var orientationLocked by rememberSaveable { mutableStateOf(false) }
+    var webtoonSuggested by rememberSaveable { mutableStateOf(false) }
     /** Page index to show (paged modes) or scroll to (webtoon). */
     val jumpEvents = remember { MutableSharedFlow<Int>(extraBufferCapacity = 8) }
     /** Webtoon only: scroll by this fraction of the viewport height (negative = up). */
@@ -108,6 +113,17 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
         activity?.requestedOrientation =
             if (orientationLocked) ActivityInfo.SCREEN_ORIENTATION_LOCKED else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         onDispose { if (orientationLocked) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
+    }
+
+    // --- webtoon suggestion (P1-2): a very tall first page in a paged mode -----------------
+    val startSize = state.pageSizes[state.currentPage]
+    LaunchedEffect(startSize, readingMode, state.readingModeOverride) {
+        val s = startSize ?: return@LaunchedEffect
+        if (webtoonSuggested || readingMode == ReadingMode.WEBTOON || state.readingModeOverride != null) return@LaunchedEffect
+        if (s.width <= 0 || s.height < s.width * WEBTOON_SUGGEST_RATIO) return@LaunchedEffect
+        webtoonSuggested = true
+        val result = snackbar.showSnackbar("세로로 긴 페이지입니다. 이 작품을 웹툰 모드로 볼까요?", actionLabel = "웹툰 모드", duration = SnackbarDuration.Long)
+        if (result == SnackbarResult.ActionPerformed) vm.setReadingModeOverride(ReadingMode.WEBTOON)
     }
 
     // --- navigation ----------------------------------------------------------------------
@@ -161,9 +177,12 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             }
             readingMode == ReadingMode.WEBTOON -> WebtoonReader(
                 pages = state.pages,
+                pageSizes = state.pageSizes,
+                store = graph.pageStore,
                 initialPage = state.currentPage,
                 jumpEvents = jumpEvents,
                 scrollEvents = scrollEvents,
+                onNeedSize = vm::ensureSize,
                 onPageChanged = vm::onPageChanged,
                 onTap = ::onZoneTap,
             )
@@ -252,6 +271,14 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                 },
             )
         }
+
+        SnackbarHost(
+            snackbar,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .navigationBarsPadding()
+                .padding(bottom = 72.dp),
+        )
     }
 
     if (showSettings) {

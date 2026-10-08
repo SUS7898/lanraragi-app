@@ -1,18 +1,11 @@
 package com.sus7898.lrrviewer.ui.reader
 
-import android.content.Context
-import androidx.core.graphics.drawable.toDrawable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import coil3.ImageLoader
-import coil3.asImage
-import coil3.decode.DecodeResult
-import coil3.decode.Decoder
-import coil3.fetch.SourceFetchResult
-import coil3.request.CachePolicy
-import coil3.request.ImageRequest
-import coil3.request.Options
 import com.sus7898.lrrviewer.data.AppSettings
+import com.sus7898.lrrviewer.data.PageImageStore
+import com.sus7898.lrrviewer.data.PageInfoRepository
+import com.sus7898.lrrviewer.data.PageSize
 import com.sus7898.lrrviewer.data.ReadingMode
 import com.sus7898.lrrviewer.data.ReadingProgressRepository
 import com.sus7898.lrrviewer.data.api.Archive
@@ -45,9 +38,9 @@ class ReaderViewModel(
     class Deps(
         val api: LrrApi,
         val progress: ReadingProgressRepository,
+        val pageInfo: PageInfoRepository,
+        val store: PageImageStore,
         val settings: StateFlow<AppSettings>,
-        val imageLoader: ImageLoader,
-        val appContext: Context,
         /** Outlives the ViewModel; used to flush progress from onCleared(). */
         val appScope: CoroutineScope,
     )
@@ -62,6 +55,8 @@ class ReaderViewModel(
         val toc: List<TocEntry> = emptyList(),
         /** Per-archive reading mode; null means "use the global default". */
         val readingModeOverride: ReadingMode? = null,
+        /** Pixel sizes of the pages read so far (webtoon layout/tiling, mode suggestion). */
+        val pageSizes: Map<Int, PageSize> = emptyMap(),
     ) {
         val pageCount: Int get() = pages.size
     }
@@ -74,6 +69,7 @@ class ReaderViewModel(
     private var clearedNew = false
     private var progressJob: Job? = null
     private val prefetched = HashSet<Int>()
+    private val sizeRequests = HashSet<Int>()
 
     init { load() }
 
@@ -83,6 +79,7 @@ class ReaderViewModel(
             try {
                 val metaDeferred = async { runCatching { deps.api.metadata(arcId) }.getOrNull() }
                 val savedDeferred = async { deps.progress.get(arcId) }
+                val sizesDeferred = async { runCatching { deps.pageInfo.cached(arcId) }.getOrDefault(emptyMap()) }
                 var files = deps.api.files(arcId, force)
                 archive = metaDeferred.await()
                 val saved = savedDeferred.await()
@@ -96,6 +93,7 @@ class ReaderViewModel(
                 }
                 val start = resolveStartPage(pages.size, saved?.page ?: -1)
                 prefetched.clear()
+                sizeRequests.clear()
                 _state.update {
                     it.copy(
                         loading = false,
@@ -105,12 +103,14 @@ class ReaderViewModel(
                         currentPage = start,
                         toc = archive?.tocEntries.orEmpty(),
                         readingModeOverride = saved?.readingModeOverride,
+                        pageSizes = sizesDeferred.await().filterKeys { k -> k in pages.indices },
                     )
                 }
                 if (serverTracksProgress == null) {
                     serverTracksProgress = runCatching { deps.api.info().server_tracks_progress }.getOrDefault(false)
                 }
                 prefetchAround(start)
+                ensureSize(start)
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, extracting = false, error = e.userMessage()) }
             }
@@ -184,12 +184,18 @@ class ReaderViewModel(
         val targets = (index + 1..index + count) + (index - 1)
         for (i in targets) {
             if (i !in pages.indices || !prefetched.add(i)) continue
-            val request = ImageRequest.Builder(deps.appContext)
-                .data(pages[i])
-                .memoryCachePolicy(CachePolicy.DISABLED)
-                .decoderFactory(DiskOnlyDecoder.Factory)
-                .build()
-            deps.imageLoader.enqueue(request)
+            deps.store.enqueuePrefetch(pages[i])
+        }
+    }
+
+    /** Reads the pixel size of page [index] once (downloading the page into the disk cache if needed). */
+    fun ensureSize(index: Int) {
+        val pages = _state.value.pages
+        if (index !in pages.indices || index in _state.value.pageSizes || !sizeRequests.add(index)) return
+        viewModelScope.launch {
+            val size = runCatching { deps.pageInfo.size(arcId, index, pages[index]) }.getOrNull()
+            if (size != null) _state.update { it.copy(pageSizes = it.pageSizes + (index to size)) }
+            else sizeRequests.remove(index) // allow a retry later (network error)
         }
     }
 
@@ -198,19 +204,6 @@ class ReaderViewModel(
         val index = _state.value.currentPage
         if (_state.value.pages.isNotEmpty()) {
             deps.appScope.launch { persistProgress(index) }
-        }
-    }
-}
-
-/** A decoder that decodes nothing: the fetcher has already written the bytes to the disk cache. */
-private object DiskOnlyDecoder : Decoder {
-    override suspend fun decode(): DecodeResult =
-        DecodeResult(image = android.graphics.Color.TRANSPARENT.toDrawable().asImage(), isSampled = false)
-
-    object Factory : Decoder.Factory {
-        override fun create(result: SourceFetchResult, options: Options, imageLoader: ImageLoader): Decoder {
-            result.source.close()
-            return DiskOnlyDecoder
         }
     }
 }

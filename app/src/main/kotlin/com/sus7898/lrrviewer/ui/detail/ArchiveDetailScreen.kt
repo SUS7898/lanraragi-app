@@ -50,7 +50,7 @@ fun ArchiveDetailScreen(
     onSearchTag: (String) -> Unit,
 ) {
     val vm: ArchiveDetailViewModel = viewModel(key = "detail_$id") {
-        ArchiveDetailViewModel(graph.api, graph.progress, graph.favorites, graph.settingsState, id)
+        ArchiveDetailViewModel(graph.api, graph.progress, graph.favorites, graph.pageInfo, graph.settingsState, id)
     }
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }

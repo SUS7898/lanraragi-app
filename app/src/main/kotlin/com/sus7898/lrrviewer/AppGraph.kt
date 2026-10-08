@@ -10,6 +10,8 @@ import coil3.request.crossfade
 import com.sus7898.lrrviewer.data.AppSettings
 import com.sus7898.lrrviewer.data.CategoryOrderRepository
 import com.sus7898.lrrviewer.data.FavoritesRepository
+import com.sus7898.lrrviewer.data.PageImageStore
+import com.sus7898.lrrviewer.data.PageInfoRepository
 import com.sus7898.lrrviewer.data.ReadingProgressRepository
 import com.sus7898.lrrviewer.data.SecureStore
 import com.sus7898.lrrviewer.data.SettingsRepository
@@ -78,14 +80,18 @@ class AppGraph(private val app: Application) {
         .crossfade(false)
         .build()
 
+    /** Page files in the Coil disk cache: prefetch, dimensions, region (tile) decoding. */
+    val pageStore = PageImageStore(app, imageLoader)
+    val pageInfo = PageInfoRepository(database.pageInfoDao(), pageStore)
+
     val updater = UpdateManager(app, httpClient, scope)
 
     val readerDeps = ReaderViewModel.Deps(
         api = api,
         progress = progress,
+        pageInfo = pageInfo,
+        store = pageStore,
         settings = settingsState,
-        imageLoader = imageLoader,
-        appContext = app,
         appScope = scope,
     )
 

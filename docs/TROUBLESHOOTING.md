@@ -220,3 +220,20 @@
 - `LibraryViewModel`은 init에서 검색·카테고리·북마크 링크·info를 **동시에** 요청하므로 `enqueue` 순서 큐가 어긋난다.
   → `server.dispatcher = object : Dispatcher()`로 경로별 응답을 돌려주고, `Dispatchers.setMain(UnconfinedTestDispatcher())` + `state.first { … }`로 기다린다.
 - `Collator.getInstance(Locale.KOREAN)`은 라틴 문자를 한글보다 앞에 둔다(`Apple` < `Vol 2` < `즐겨찾기`). 정렬 테스트 기대값을 그에 맞춘다.
+
+## G. 리더 이미지 파이프라인 (v0.1.2, 페이지 치수 캐시·웹툰 타일링)
+
+### G-1. Coil 3 디스크 캐시에서 원본 파일 꺼내기
+- `imageLoader.diskCache?.openSnapshot(key)`의 키는 네트워크 페처가 쓴 **페이지 URL 문자열 그대로**(`diskCacheKey` 미지정 시).
+  `Snapshot.data`(okio Path)는 스냅샷을 닫기 전까지만 유효하므로 `snapshot.use { decode(it.data.toFile()) }` 안에서 디코딩한다.
+- 캐시에 없으면 `DiskOnlyDecoder`(디코딩 안 함) 요청을 `imageLoader.execute()`로 **동기 실행**한 뒤 다시 연다. `enqueue`는 완료를 기다리지 않는다.
+- `diskCache`/`openSnapshot`은 `@ExperimentalCoilApi` → `@OptIn` 필요.
+
+### G-2. `BitmapRegionDecoder.newInstance` 오버로드
+- API 31+: `newInstance(InputStream)`(비추천 아님). 그 미만: `newInstance(String path, Boolean)`(31에서 deprecated) → SDK 분기 + `@Suppress("DEPRECATION")`.
+- 영역 Rect는 디코더의 `width/height`로 클램프해야 한다(치수 캐시와 실제 파일이 다를 수 있음). 쓰고 나면 `recycle()`.
+
+### G-3. LazyColumn 행이 바뀌어도 스크롤이 튀지 않게 하기
+- 크기를 모르는 행(Pending)이 실제 행(Whole/Tile 0)으로 바뀔 때 **key가 같아야** 첫 보이는 항목 앵커가 유지된다 (`"${page}_0"`).
+  key가 바뀌면 LazyColumn은 인덱스로 되돌아가 위치가 흔들린다.
+- 치수를 읽는 동안 Coil에 실제 이미지를 요청하지 않는다(자리표시만). 치수 조회가 파일을 디스크 캐시에 받아두므로 이후 Coil 로드는 즉시다.

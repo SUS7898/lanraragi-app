@@ -76,15 +76,44 @@ interface CategoryOrderDao {
     }
 }
 
+/**
+ * Pixel dimensions of archive pages, read once from the downloaded file. Lets the webtoon reader lay out
+ * (and tile) pages before they are decoded, and is the basis for spreads / reading-mode detection.
+ */
+@Entity(tableName = "page_info", primaryKeys = ["serverId", "arcid", "pageIndex"])
+data class PageInfoEntity(
+    val serverId: String,
+    val arcid: String,
+    val pageIndex: Int,
+    val width: Int,
+    val height: Int,
+)
+
+@Dao
+interface PageInfoDao {
+    @Query("SELECT * FROM page_info WHERE serverId = :serverId AND arcid = :arcid")
+    suspend fun forArchive(serverId: String, arcid: String): List<PageInfoEntity>
+
+    @Query("SELECT * FROM page_info WHERE serverId = :serverId AND arcid = :arcid AND pageIndex = :pageIndex")
+    suspend fun get(serverId: String, arcid: String, pageIndex: Int): PageInfoEntity?
+
+    @Upsert
+    suspend fun upsert(entity: PageInfoEntity)
+
+    @Query("DELETE FROM page_info WHERE serverId = :serverId AND arcid = :arcid")
+    suspend fun deleteArchive(serverId: String, arcid: String)
+}
+
 @Database(
-    entities = [ReadingProgressEntity::class, CategoryOrderEntity::class],
-    version = 2,
+    entities = [ReadingProgressEntity::class, CategoryOrderEntity::class, PageInfoEntity::class],
+    version = 3,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun readingProgressDao(): ReadingProgressDao
     abstract fun categoryOrderDao(): CategoryOrderDao
+    abstract fun pageInfoDao(): PageInfoDao
 
     companion object {
         fun create(context: Context): AppDatabase =

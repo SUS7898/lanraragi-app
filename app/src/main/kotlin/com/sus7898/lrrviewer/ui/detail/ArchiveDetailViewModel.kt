@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.sus7898.lrrviewer.data.AppSettings
 import com.sus7898.lrrviewer.data.FavoritesRepository
+import com.sus7898.lrrviewer.data.PageInfoRepository
 import com.sus7898.lrrviewer.data.ReadingProgressRepository
 import com.sus7898.lrrviewer.data.api.Archive
 import com.sus7898.lrrviewer.data.api.LrrApi
@@ -19,6 +20,7 @@ class ArchiveDetailViewModel(
     private val api: LrrApi,
     private val progress: ReadingProgressRepository,
     private val favorites: FavoritesRepository,
+    private val pageInfo: PageInfoRepository,
     private val settings: StateFlow<AppSettings>,
     val id: String,
 ) : ViewModel() {
@@ -96,7 +98,11 @@ class ArchiveDetailViewModel(
         viewModelScope.launch {
             _state.update { it.copy(busy = true) }
             runCatching { api.files(id, force = true) }
-                .onSuccess { _state.update { it.copy(message = "서버에 재추출을 요청했습니다.") } }
+                .onSuccess {
+                    // The page list (and therefore the cached page sizes) may change after a re-extraction.
+                    runCatching { pageInfo.clear(id) }
+                    _state.update { it.copy(message = "서버에 재추출을 요청했습니다.") }
+                }
                 .onFailure { e -> _state.update { it.copy(message = e.userMessage()) } }
             _state.update { it.copy(busy = false) }
         }

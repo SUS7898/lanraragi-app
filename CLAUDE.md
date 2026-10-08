@@ -44,11 +44,13 @@ app/src/main/kotlin/com/sus7898/lrrviewer/
   data/AppSettings.kt          설정 데이터 클래스 + enum (ReadingMode 등)
   data/SettingsRepository.kt   DataStore 저장, API 키는 SecureStore로 암호화
   data/SecureStore.kt          Android Keystore AES-GCM
-  data/db/AppDatabase.kt       Room: reading_progress(serverId, arcid, …) + DAO. 스키마 JSON은 app/schemas/ (로컬 빌드 후 커밋)
+  data/db/AppDatabase.kt       Room v3: reading_progress / category_order / page_info + DAO. 스키마 JSON은 app/schemas/ (로컬 빌드 후 커밋)
   data/ReadingProgressRepository.kt  로컬 읽기 기록/진행률/작품별 읽기 방향 (Room 위)
   data/CategoryOrderRepository.kt    카테고리 수동 순서 (Room category_order), data/CategorySorting.kt 정렬 모드·자연수 정렬
   data/FavoritesRepository.kt        즐겨찾기 = 서버 북마크 카테고리(멤버 집합 공유, 🔑 토글)
   CrashLog.kt                        마지막 미처리 예외를 files/crash/에 저장 (설정 → 정보)
+  data/PageImageStore.kt             페이지 파일 = Coil 디스크 캐시: 프리페치(DiskOnlyDecoder)·치수(inJustDecodeBounds)·영역 디코딩(타일 LRU)
+  data/PageInfoRepository.kt         페이지 치수 캐시 (Room page_info) — 웹툰 타일링·모드 제안·(향후) 양면 보기의 기반
   data/api/LrrApi.kt           LANraragi API 클라이언트 (OkHttp + kotlinx.serialization)
   data/api/Models.kt           Archive/ServerInfo/… (관대한 파싱)
   data/api/LenientSerializers.kt  "" / "3" / null / "none" 모두 허용하는 직렬화기
@@ -58,7 +60,7 @@ app/src/main/kotlin/com/sus7898/lrrviewer/
   update/InstallResultReceiver.kt  설치 세션 결과 수신(사용자 확인 화면 띄움)
   ui/AppRoot.kt                타입 안전 라우트(SetupRoute/HomeRoute/ArchiveRoute/ReaderRoute) + 자동 업데이트 다이얼로그
   ui/home/, ui/library/, ui/history/, ui/detail/, ui/settings/ (CategoryOrderScreen = 드래그 순서 편집, sh.calvin.reorderable)
-  ui/reader/ReaderScreen.kt    호스트(크롬·시스템 UI·키) / PagedReader.kt / WebtoonReader.kt / ReaderGestures.kt / ReaderViewModel.kt(Deps)
+  ui/reader/ReaderScreen.kt    호스트(크롬·시스템 UI·키) / PagedReader.kt / WebtoonReader.kt(+WebtoonLayout.kt 행·타일 계산) / ReaderGestures.kt / ReaderViewModel.kt(Deps)
 app/src/test/…                 JVM 단위 테스트(MockWebServer 포함)
 .github/workflows/ci.yml       테스트·린트·디버그 APK
 .github/workflows/release.yml  태그 → 서명 릴리스 APK + 체크섬 + Trivy 게이트
