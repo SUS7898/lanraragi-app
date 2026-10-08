@@ -22,6 +22,7 @@
 - [ ] v0.1.1 실기기 테스트 (`docs/TEST_CHECKLIST.md` §9b + 앱 내 업데이트 §8)
 - [x] v0.1.2: Room `page_info`(v3) + `PageImageStore`(디스크 캐시 파일·치수·영역 디코딩) + 웹툰 타일링(≤2048px 밴드) + 실제 종횡비
       레이아웃 + 웹툰 모드 제안 스낵바 + 재추출 시 치수 캐시 삭제 — 단위 테스트 43개, Lint 0 errors(로컬)
+- [x] v0.1.2 릴리스 게시 (Release run 37748445551)
 - [ ] v0.1.2 실기기 테스트 (§5 스트립 항목, §9c)
 - [ ] 실기기 피드백 반영 (제스처 감도, 웹툰 모드 줌, 탭존 비율 등)
 
@@ -53,3 +54,5 @@
 | 2026-10-07 | 로컬 빌드 v0.1.1 작업분 (`.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`) | ✅ 39 tests, Lint 0 errors/13 warnings(버전 핀), app-debug.apk |
 | 2026-10-07 | CI run 37625351034 + Security Scan run 37625350998 (커밋 ae5aa53, v0.1.1 작업분) | ✅ 전부 성공 |
 | 2026-10-07 | Release run 37626031611 (태그 v0.1.1) | ✅ lrr-viewer-v0.1.1.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 → 앱 내 업데이트로 설치 가능 |
+| 2026-10-08 | CI run 37711786273 + Security Scan run 37711786278 (커밋 fee68b5, v0.1.2 작업분) | ✅ 전부 성공 |
+| 2026-10-08 | Release run 37748445551 (태그 v0.1.2) | ✅ lrr-viewer-v0.1.2.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
