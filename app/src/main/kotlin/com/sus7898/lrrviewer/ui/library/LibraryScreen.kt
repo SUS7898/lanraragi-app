@@ -143,7 +143,10 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
                                 archive = archive,
                                 thumbnailUrl = graph.api.thumbnailUrl(archive.arcid),
                                 favorite = archive.arcid in state.favoriteIds,
-                                onClick = { onOpenArchive(archive.arcid) },
+                                onClick = {
+                                    graph.readerQueue.value = state.items.filter { !it.isTankoubon }.map { it.arcid }
+                                    onOpenArchive(archive.arcid)
+                                },
                             )
                         }
                         if (state.loadingMore) {

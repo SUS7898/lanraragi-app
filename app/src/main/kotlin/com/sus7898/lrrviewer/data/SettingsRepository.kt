@@ -43,6 +43,8 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         val CATEGORY_SORT = stringPreferencesKey("category_sort")
         val SPREAD_LANDSCAPE = booleanPreferencesKey("spread_in_landscape")
         val SPREAD_COVER_ALONE = booleanPreferencesKey("spread_cover_alone")
+        val READER_BRIGHTNESS = intPreferencesKey("reader_brightness")
+        val COLOR_FILTER = stringPreferencesKey("color_filter")
         val AUTO_UPDATE = booleanPreferencesKey("auto_check_updates")
         val LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
     }
@@ -88,6 +90,8 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         categorySort = enumOrDefault(this[Keys.CATEGORY_SORT], CategorySort.NAME),
         spreadInLandscape = this[Keys.SPREAD_LANDSCAPE] ?: true,
         spreadCoverAlone = this[Keys.SPREAD_COVER_ALONE] ?: true,
+        readerBrightness = this[Keys.READER_BRIGHTNESS] ?: BRIGHTNESS_SYSTEM,
+        colorFilter = enumOrDefault(this[Keys.COLOR_FILTER], ColorFilterMode.NONE),
         autoCheckUpdates = this[Keys.AUTO_UPDATE] ?: true,
         lastUpdateCheck = this[Keys.LAST_UPDATE_CHECK] ?: 0L,
     )
@@ -113,6 +117,8 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         this[Keys.CATEGORY_SORT] = s.categorySort.name
         this[Keys.SPREAD_LANDSCAPE] = s.spreadInLandscape
         this[Keys.SPREAD_COVER_ALONE] = s.spreadCoverAlone
+        this[Keys.READER_BRIGHTNESS] = if (s.readerBrightness in 1..100) s.readerBrightness else BRIGHTNESS_SYSTEM
+        this[Keys.COLOR_FILTER] = s.colorFilter.name
         this[Keys.AUTO_UPDATE] = s.autoCheckUpdates
         this[Keys.LAST_UPDATE_CHECK] = s.lastUpdateCheck
     }

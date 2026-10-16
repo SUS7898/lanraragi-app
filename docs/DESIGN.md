@@ -70,6 +70,11 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 - **웹툰 줌(S-4)**: `graphicsLayer` 스케일을 버리고 **레이아웃 줌** — LazyColumn을 뷰포트의 `scale`배 너비로 두고 `horizontalScroll`
   안에 넣는다. 높이·스크롤 범위·탭 존·타일 샘플 크기가 모두 줌을 따라가고, 줌 변경 시 첫 보이는 항목+오프셋을 비율로 재앵커한다
   (핀치 중심이 아닌 뷰포트 중심 기준 — `transformable`은 centroid를 주지 않음). 더블 탭: 1× ↔ 2×.
+- **다음 작품 이어가기(P1-4)**: 리더를 연 목록(서재 검색 결과·탄코본 수록 순서·기록)의 arcid 목록을 `graph.readerQueue`에 넣고,
+  `ReaderViewModel`이 마지막 3페이지 안에 들면 다음 항목(탄코본 제외)의 메타데이터를 한 번 받아 `nextArchive`로 둔다. 마지막 페이지에
+  카드가 뜨고, 마지막 페이지에서 "다음" 탭/키를 누르면 `ReaderRoute(next)`로 교체(`popUpTo<ReaderRoute> inclusive`). 큐는 메모리에만.
+- **밝기·색 필터(P1-3)**: 밝기는 `window.attributes.screenBrightness`(리더 안에서만, 나가면 `BRIGHTNESS_OVERRIDE_NONE`). 색 필터는
+  RenderEffect(API 31+) 대신 `graphicsLayer(Offscreen)` + `drawWithContent`의 블렌드(Saturation=흑백, Multiply=세피아/따뜻하게)로 API 28에서도 동작.
 - 의도적으로 하지 않은 것: 멀티모듈, DI 프레임워크, `strings.xml` 분리(개인용·한국어 단일; 공개 배포 시 재검토).
 
 ## 4. LANraragi API 메모 (소스 `tools/openapi.yaml`, `Controller/Api/*.pm` 확인)
@@ -106,6 +111,7 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 펀치홀 컷아웃 영역까지 그리기 · 뒤로 가기 계층 · 서버 응답 오류로 건너뛴 항목 수 표시.
 v0.1.2: 페이지 치수 캐시 · 웹툰 세로 스트립 타일링(2048px 밴드, 영역 디코딩) · 실제 종횡비 레이아웃 · 웹툰 모드 제안 스낵바.
 v0.1.3: 가로 모드 양면 보기(표지 단독·가로 페이지 단독 옵션) · 웹툰 레이아웃 줌(1~3×, 더블 탭 2×).
+v0.1.4: 마지막 페이지에서 다음 작품 카드/넘김 · 리더 밝기(1~100%) · 색 필터(흑백/세피아/따뜻하게).
 
 ## 6. 자체 업데이트 설계
 1. `GET https://api.github.com/repos/{owner}/{repo}/releases/latest` (하루 1회 자동 + 수동).

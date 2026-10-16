@@ -95,6 +95,9 @@ class AppGraph(private val app: Application) {
         appScope = scope,
     )
 
+    /** Archive ids of the list the reader was opened from (library results, tankoubon, history): "next archive" source. */
+    val readerQueue = MutableStateFlow<List<String>>(emptyList())
+
     /** A tag search requested from another screen; the library consumes and clears it. */
     val pendingLibrarySearch = MutableStateFlow<String?>(null)
 }

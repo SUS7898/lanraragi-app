@@ -336,7 +336,10 @@ private fun TankoubonContent(
                 archive = a,
                 thumbnailUrl = graph.api.thumbnailUrl(a.arcid),
                 favorite = a.arcid in favoriteIds,
-                onClick = { onOpenArchive(a.arcid) },
+                onClick = {
+                    graph.readerQueue.value = archives.map { it.arcid }
+                    onOpenArchive(a.arcid)
+                },
             )
         }
         if (archives.isEmpty()) {

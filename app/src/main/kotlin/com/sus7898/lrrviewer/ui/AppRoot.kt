@@ -78,7 +78,13 @@ fun AppRoot(graph: AppGraph, settings: AppSettings) {
         }
         composable<ReaderRoute> { entry ->
             val route = entry.toRoute<ReaderRoute>()
-            ReaderScreen(graph = graph, arcId = route.id, startPage = route.page, onBack = { navController.popBackStack() })
+            ReaderScreen(
+                graph = graph,
+                arcId = route.id,
+                startPage = route.page,
+                onBack = { navController.popBackStack() },
+                onOpenNext = { nextId -> navController.navigate(ReaderRoute(nextId)) { popUpTo<ReaderRoute> { inclusive = true } } },
+            )
         }
         composable<CategoryOrderRoute> {
             CategoryOrderScreen(graph = graph, onBack = { navController.popBackStack() })

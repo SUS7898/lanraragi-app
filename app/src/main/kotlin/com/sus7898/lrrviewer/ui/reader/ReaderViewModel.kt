@@ -32,6 +32,8 @@ class ReaderViewModel(
     private val deps: Deps,
     val arcId: String,
     private val requestedPage: Int,
+    /** Ids of the list this archive was opened from; the entry after [arcId] becomes the "next archive". */
+    private val queue: List<String> = emptyList(),
 ) : ViewModel() {
 
     /** Everything the reader needs from the app graph; keeps the ViewModel testable without the whole graph. */
@@ -57,6 +59,8 @@ class ReaderViewModel(
         val readingModeOverride: ReadingMode? = null,
         /** Pixel sizes of the pages read so far (webtoon layout/tiling, mode suggestion). */
         val pageSizes: Map<Int, PageSize> = emptyMap(),
+        /** Metadata of the archive that follows in the queue, loaded when the last pages come into view. */
+        val nextArchive: Archive? = null,
     ) {
         val pageCount: Int get() = pages.size
     }
@@ -70,6 +74,7 @@ class ReaderViewModel(
     private var progressJob: Job? = null
     private val prefetched = HashSet<Int>()
     private val sizeRequests = HashSet<Int>()
+    private var nextLoaded = false
 
     init { load() }
 
@@ -111,6 +116,7 @@ class ReaderViewModel(
                 }
                 prefetchAround(start)
                 ensureSize(start)
+                maybeLoadNext(start)
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, extracting = false, error = e.userMessage()) }
             }
@@ -155,6 +161,7 @@ class ReaderViewModel(
         if (index == _state.value.currentPage && progressJob != null) return
         _state.update { it.copy(currentPage = index) }
         prefetchAround(index)
+        maybeLoadNext(index)
         progressJob?.cancel()
         progressJob = viewModelScope.launch {
             delay(700)
@@ -199,11 +206,32 @@ class ReaderViewModel(
         }
     }
 
+    /** Within the last three pages: fetch the title/thumbnail of the next archive once so the end card is ready. */
+    private fun maybeLoadNext(index: Int) {
+        val s = _state.value
+        if (nextLoaded || s.pages.isEmpty() || index < s.pageCount - 3) return
+        val nextId = nextArchiveIn(queue, arcId) ?: return
+        nextLoaded = true
+        viewModelScope.launch {
+            val next = runCatching { deps.api.metadata(nextId) }.getOrNull() ?: Archive(arcid = nextId)
+            _state.update { it.copy(nextArchive = next) }
+        }
+    }
+
     override fun onCleared() {
         progressJob?.cancel()
         val index = _state.value.currentPage
         if (_state.value.pages.isNotEmpty()) {
             deps.appScope.launch { persistProgress(index) }
+        }
+    }
+
+    companion object {
+        /** The entry after [current] in [queue], skipping tankoubons; null when absent or [current] is not queued. */
+        fun nextArchiveIn(queue: List<String>, current: String): String? {
+            val i = queue.indexOf(current)
+            if (i < 0) return null
+            return queue.drop(i + 1).firstOrNull { !it.startsWith("TANK_") }
         }
     }
 }

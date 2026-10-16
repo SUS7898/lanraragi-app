@@ -88,7 +88,10 @@ fun HistoryScreen(
                             }
                         },
                         modifier = Modifier.combinedClickable(
-                            onClick = { onOpenReader(e.arcid, if (e.isCompleted) 0 else e.page) },
+                            onClick = {
+                                graph.readerQueue.value = entries.map { it.arcid }
+                                onOpenReader(e.arcid, if (e.isCompleted) 0 else e.page)
+                            },
                             onLongClick = { onOpenArchive(e.arcid) },
                         ),
                     )

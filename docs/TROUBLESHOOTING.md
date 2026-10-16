@@ -249,3 +249,13 @@
   유지한다. 인덱스+오프셋은 다음 측정에서 적용되므로 재레이아웃 전에 호출해도 된다.
 - `transformable(canPan = { false })`로 핀치만 받고, 가로 이동은 `horizontalScroll`, 세로는 LazyColumn이 처리한다. `detectTransformGestures`는
   한 손가락 이동까지 소비해 세로 스크롤을 막으므로 쓰지 않는다. 더블 탭은 `detectTapGestures(onDoubleTap)`.
+
+### G-6. 색 필터를 API 28에서도: RenderEffect 대신 블렌드
+- `Modifier.graphicsLayer(renderEffect=…)`의 ColorFilter 효과는 API 31+. 대신 `graphicsLayer(compositingStrategy = Offscreen)`으로
+  오프스크린 합성 후 `drawWithContent { drawContent(); drawRect(Color.Gray, blendMode = BlendMode.Saturation) }` → 흑백.
+  Multiply로 따뜻한 색을 곱하면 세피아/블루라이트 감소. Offscreen 없이 Saturation 블렌드를 쓰면 배경(검정)과 섞여 결과가 달라진다.
+- 밝기는 `window.attributes.screenBrightness`를 바꾸는 것이라 시스템 밝기 설정은 건드리지 않는다. 나갈 때 `BRIGHTNESS_OVERRIDE_NONE`로 복구.
+
+### G-7. "다음 작품" 전환은 pop + navigate가 아닌 popUpTo inclusive
+- `navigate(ReaderRoute(next)) { popUpTo<ReaderRoute> { inclusive = true } }`로 현재 리더를 백스택에서 빼고 새 리더를 넣어야 뒤로 가기가
+  상세/서재로 바로 돌아간다. ViewModel key가 `reader_$arcId`라 새 리더는 새 VM을 만들고, 이전 VM의 `onCleared`가 진행률을 저장한다.

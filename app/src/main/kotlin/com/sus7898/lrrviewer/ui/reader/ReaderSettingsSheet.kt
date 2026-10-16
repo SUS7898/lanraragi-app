@@ -6,15 +6,23 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.sus7898.lrrviewer.data.AppSettings
+import com.sus7898.lrrviewer.data.BRIGHTNESS_SYSTEM
+import com.sus7898.lrrviewer.data.ColorFilterMode
 import com.sus7898.lrrviewer.data.FitMode
 import com.sus7898.lrrviewer.data.ReaderBackground
 import com.sus7898.lrrviewer.data.ReadingMode
 import com.sus7898.lrrviewer.data.api.TocEntry
 import com.sus7898.lrrviewer.ui.common.StepperRow
 import com.sus7898.lrrviewer.ui.common.SwitchRow
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -45,6 +53,8 @@ fun ReaderSettingsSheet(
             ) { v -> onOverrideChange(v) }
             ChoiceChips("이미지 맞춤", FitMode.entries, settings.fitMode, { it.label }) { v -> onChange { it.copy(fitMode = v) } }
             ChoiceChips("배경", ReaderBackground.entries, settings.background, { it.label }) { v -> onChange { it.copy(background = v) } }
+            ChoiceChips("색 필터", ColorFilterMode.entries, settings.colorFilter, { it.label }) { v -> onChange { it.copy(colorFilter = v) } }
+            BrightnessRow(settings.readerBrightness) { v -> onChange { it.copy(readerBrightness = v) } }
 
             SwitchRow("가로 모드에서 양면 보기", settings.spreadInLandscape, "좌우 넘김 모드에서 세로 페이지 두 장을 나란히") { v -> onChange { it.copy(spreadInLandscape = v) } }
             SwitchRow("표지는 한 장으로", settings.spreadCoverAlone, enabled = settings.spreadInLandscape) { v -> onChange { it.copy(spreadCoverAlone = v) } }
@@ -53,6 +63,32 @@ fun ReaderSettingsSheet(
             SwitchRow("화면 항상 켜기", settings.keepScreenOn) { v -> onChange { it.copy(keepScreenOn = v) } }
             SwitchRow("페이지 번호 표시", settings.showPageNumber) { v -> onChange { it.copy(showPageNumber = v) } }
             StepperRow("미리 불러올 페이지", settings.prefetchPages, 0..10) { v -> onChange { it.copy(prefetchPages = v) } }
+        }
+    }
+}
+
+/** Brightness while reading: a "시스템" chip or a 1..100 % slider (applied to the window, not the system setting). */
+@Composable
+private fun BrightnessRow(value: Int, onChange: (Int) -> Unit) {
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("밝기 (읽는 동안만)", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+            FilterChip(selected = value == BRIGHTNESS_SYSTEM, onClick = { onChange(BRIGHTNESS_SYSTEM) }, label = { Text("시스템") })
+        }
+        var sliderPos by remember(value) { mutableFloatStateOf(if (value in 1..100) value.toFloat() else 50f) }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Slider(
+                value = sliderPos,
+                onValueChange = { sliderPos = it },
+                onValueChangeFinished = { onChange(sliderPos.roundToInt().coerceIn(1, 100)) },
+                valueRange = 1f..100f,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                if (value in 1..100) "$value%" else "시스템",
+                style = MaterialTheme.typography.labelMedium,
+                modifier = Modifier.widthIn(min = 48.dp),
+            )
         }
     }
 }

@@ -22,7 +22,9 @@ import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalView
@@ -35,11 +37,13 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.sus7898.lrrviewer.AppGraph
 import com.sus7898.lrrviewer.ReaderKey
 import com.sus7898.lrrviewer.ReaderKeyEvents
 import com.sus7898.lrrviewer.data.ReaderBackground
 import com.sus7898.lrrviewer.data.ReadingMode
+import com.sus7898.lrrviewer.data.api.Archive
 import com.sus7898.lrrviewer.ui.common.ErrorView
 import com.sus7898.lrrviewer.ui.common.findActivity
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -55,8 +59,10 @@ private const val WEBTOON_SUGGEST_RATIO = 2.5f
 /** Reader host: system UI, hardware keys, chrome (top/bottom bars), sheets. Page rendering lives in PagedReader / WebtoonReader. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> Unit) {
-    val vm: ReaderViewModel = viewModel(key = "reader_$arcId") { ReaderViewModel(graph.readerDeps, arcId, startPage) }
+fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> Unit, onOpenNext: (String) -> Unit) {
+    val vm: ReaderViewModel = viewModel(key = "reader_$arcId") {
+        ReaderViewModel(graph.readerDeps, arcId, startPage, graph.readerQueue.value)
+    }
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by graph.settingsState.collectAsStateWithLifecycle()
     val readingMode = state.readingModeOverride ?: settings.readingMode
@@ -99,6 +105,18 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             }
         }
     }
+    // Reader-only brightness: a window attribute, so the system setting is untouched and restored on exit.
+    DisposableEffect(settings.readerBrightness) {
+        val window = activity?.window
+        if (window != null && settings.readerBrightness in 1..100) {
+            window.attributes = window.attributes.apply { screenBrightness = settings.readerBrightness / 100f }
+        }
+        onDispose {
+            window?.let { w ->
+                w.attributes = w.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
+            }
+        }
+    }
     DisposableEffect(settings.keepScreenOn) {
         val window = activity?.window
         if (settings.keepScreenOn) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
@@ -127,7 +145,7 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
     }
 
     // --- navigation ----------------------------------------------------------------------
-    /** Next/previous for taps and keys: a page in paged modes, most of a screen in webtoon mode. */
+    /** Next/previous for taps and keys: a page in paged modes, most of a screen in webtoon mode; past the last page → next archive. */
     fun navigate(forward: Boolean) {
         val s = vm.state.value
         val mode = s.readingModeOverride ?: graph.settingsState.value.readingMode
@@ -136,7 +154,11 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             return
         }
         val target = if (forward) s.currentPage + 1 else s.currentPage - 1
-        if (target in 0 until s.pageCount) jumpEvents.tryEmit(target) else chromeVisible = true
+        when {
+            target in 0 until s.pageCount -> jumpEvents.tryEmit(target)
+            forward && s.nextArchive != null -> onOpenNext(s.nextArchive.arcid)
+            else -> chromeVisible = true
+        }
     }
 
     LaunchedEffect(Unit) {
@@ -169,36 +191,38 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             .fillMaxSize()
             .background(background),
     ) {
-        when {
-            state.loading -> ReaderLoading(if (state.extracting) "서버에서 아카이브 압축을 푸는 중…" else "불러오는 중…")
-            state.error != null -> Column(Modifier.fillMaxSize()) {
-                ErrorView(state.error!!, modifier = Modifier.weight(1f), onRetry = { vm.load() })
-                TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 32.dp)) { Text("돌아가기") }
+        Box(Modifier.fillMaxSize().readerColorFilter(settings.colorFilter)) {
+            when {
+                state.loading -> ReaderLoading(if (state.extracting) "서버에서 아카이브 압축을 푸는 중…" else "불러오는 중…")
+                state.error != null -> Column(Modifier.fillMaxSize()) {
+                    ErrorView(state.error!!, modifier = Modifier.weight(1f), onRetry = { vm.load() })
+                    TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 32.dp)) { Text("돌아가기") }
+                }
+                readingMode == ReadingMode.WEBTOON -> WebtoonReader(
+                    pages = state.pages,
+                    pageSizes = state.pageSizes,
+                    store = graph.pageStore,
+                    initialPage = state.currentPage,
+                    jumpEvents = jumpEvents,
+                    scrollEvents = scrollEvents,
+                    onNeedSize = vm::ensureSize,
+                    onPageChanged = vm::onPageChanged,
+                    onTap = ::onZoneTap,
+                )
+                else -> PagedReader(
+                    pages = state.pages,
+                    pageSizes = state.pageSizes,
+                    initialPage = state.currentPage,
+                    mode = readingMode,
+                    fitMode = settings.fitMode,
+                    twoPageLandscape = settings.spreadInLandscape,
+                    coverAlone = settings.spreadCoverAlone,
+                    jumpEvents = jumpEvents,
+                    onNeedSize = vm::ensureSize,
+                    onPageChanged = vm::onPageChanged,
+                    onTap = ::onZoneTap,
+                )
             }
-            readingMode == ReadingMode.WEBTOON -> WebtoonReader(
-                pages = state.pages,
-                pageSizes = state.pageSizes,
-                store = graph.pageStore,
-                initialPage = state.currentPage,
-                jumpEvents = jumpEvents,
-                scrollEvents = scrollEvents,
-                onNeedSize = vm::ensureSize,
-                onPageChanged = vm::onPageChanged,
-                onTap = ::onZoneTap,
-            )
-            else -> PagedReader(
-                pages = state.pages,
-                pageSizes = state.pageSizes,
-                initialPage = state.currentPage,
-                mode = readingMode,
-                fitMode = settings.fitMode,
-                twoPageLandscape = settings.spreadInLandscape,
-                coverAlone = settings.spreadCoverAlone,
-                jumpEvents = jumpEvents,
-                onNeedSize = vm::ensureSize,
-                onPageChanged = vm::onPageChanged,
-                onTap = ::onZoneTap,
-            )
         }
 
         if (!chromeVisible && settings.showPageNumber && state.pageCount > 0) {
@@ -212,6 +236,20 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                     .background(Color.Black.copy(alpha = 0.5f), MaterialTheme.shapes.small)
                     .padding(horizontal = 8.dp, vertical = 2.dp),
             )
+        }
+
+        // Last page: offer the next archive of the list this one was opened from (P1-4).
+        val next = state.nextArchive
+        AnimatedVisibility(
+            visible = next != null && state.pageCount > 0 && state.currentPage >= state.pageCount - 1,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = if (chromeVisible) 132.dp else 40.dp)
+                .padding(horizontal = 16.dp),
+            enter = fadeIn() + slideInVertically { it / 2 },
+            exit = fadeOut() + slideOutVertically { it / 2 },
+        ) {
+            if (next != null) NextArchiveCard(next, graph.api.thumbnailUrl(next.arcid)) { onOpenNext(next.arcid) }
         }
 
         AnimatedVisibility(
@@ -304,6 +342,27 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             },
             onDismiss = { showToc = false },
         )
+    }
+}
+
+/** "다음 작품" card shown on the last page; tapping it replaces this reader with the next archive. */
+@Composable
+private fun NextArchiveCard(next: Archive, thumbnailUrl: String, onOpen: () -> Unit) {
+    Card(onClick = onOpen) {
+        Row(Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            AsyncImage(
+                model = thumbnailUrl,
+                contentDescription = null,
+                contentScale = ContentScale.Crop,
+                modifier = Modifier.size(width = 44.dp, height = 62.dp).clip(MaterialTheme.shapes.small),
+            )
+            Column(Modifier.weight(1f)) {
+                Text("다음 작품", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                Text(next.title.ifBlank { next.filename.ifBlank { next.arcid } }, maxLines = 2, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium)
+                if (next.pagecount > 0) Text("${next.pagecount}p", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            }
+            Button(onClick = onOpen) { Text("읽기") }
+        }
     }
 }
 

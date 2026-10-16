@@ -25,6 +25,17 @@ enum class ThemeMode(val label: String) {
     DARK("다크"),
 }
 
+/** Colour filter drawn over the reader content (see `ui/reader/ReaderFilter.kt`). */
+enum class ColorFilterMode(val label: String) {
+    NONE("없음"),
+    GRAYSCALE("흑백"),
+    SEPIA("세피아"),
+    WARM("따뜻하게 (블루라이트 감소)"),
+}
+
+/** Value of [AppSettings.readerBrightness] meaning "follow the system brightness". */
+const val BRIGHTNESS_SYSTEM = -1
+
 /**
  * All user preferences. The API key is kept decrypted only in memory; on disk it is
  * encrypted with an Android Keystore key (see [SecureStore]).
@@ -52,6 +63,9 @@ data class AppSettings(
     val spreadInLandscape: Boolean = true,
     /** With spreads on, keep the first page (cover) alone so pairs line up like a printed book. */
     val spreadCoverAlone: Boolean = true,
+    /** Screen brightness while reading: [BRIGHTNESS_SYSTEM] or 1..100 percent. */
+    val readerBrightness: Int = BRIGHTNESS_SYSTEM,
+    val colorFilter: ColorFilterMode = ColorFilterMode.NONE,
     val autoCheckUpdates: Boolean = true,
     val lastUpdateCheck: Long = 0L,
 ) {
