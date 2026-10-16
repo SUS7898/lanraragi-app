@@ -1,8 +1,11 @@
 package com.sus7898.lrrviewer.ui.reader
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -39,6 +42,7 @@ import coil3.request.ErrorResult
 import coil3.request.ImageRequest
 import coil3.request.SuccessResult
 import com.sus7898.lrrviewer.data.FitMode
+import com.sus7898.lrrviewer.data.PageSize
 import com.sus7898.lrrviewer.data.ReadingMode
 import kotlinx.coroutines.flow.SharedFlow
 import me.saket.telephoto.zoomable.ZoomSpec
@@ -46,62 +50,125 @@ import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
 import me.saket.telephoto.zoomable.rememberZoomableImageState
 import me.saket.telephoto.zoomable.rememberZoomableState
 
-/** Page-flip reader for LTR / RTL / vertical modes. One zoomable image per page. */
+/**
+ * Page-flip reader for LTR / RTL / vertical modes. One zoomable image per page; in landscape (with the
+ * setting on) two portrait pages share a slot as a spread, RTL putting the earlier page on the right.
+ */
 @Composable
 fun PagedReader(
     pages: List<String>,
+    pageSizes: Map<Int, PageSize>,
     initialPage: Int,
     mode: ReadingMode,
     fitMode: FitMode,
+    twoPageLandscape: Boolean,
+    coverAlone: Boolean,
     jumpEvents: SharedFlow<Int>,
+    onNeedSize: (Int) -> Unit,
     onPageChanged: (Int) -> Unit,
     onTap: (TapZone) -> Unit,
 ) {
-    val pagerState = rememberPagerState(initialPage = initialPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))) { pages.size }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val twoPage = twoPageLandscape && mode != ReadingMode.VERTICAL && maxWidth > maxHeight
+        val spreads = remember(pages.size, pageSizes, twoPage, coverAlone) { buildSpreads(pages.size, pageSizes, twoPage, coverAlone) }
+        var currentPage by remember { mutableIntStateOf(initialPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))) }
+        val pagerState = rememberPagerState(initialPage = spreads.indexOfPage(currentPage)) { spreads.size }
 
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }.collect { onPageChanged(it) }
-    }
-    LaunchedEffect(jumpEvents) {
-        jumpEvents.collect { p -> if (p in pages.indices) pagerState.scrollToPage(p) }
-    }
+        // Spreads are rebuilt when sizes arrive or the orientation changes: stay on the same *page*.
+        LaunchedEffect(spreads) {
+            val target = spreads.indexOfPage(currentPage)
+            if (pagerState.currentPage != target) pagerState.scrollToPage(target)
+            snapshotFlow { pagerState.currentPage }.collect { index ->
+                val spread = spreads.getOrNull(index) ?: return@collect
+                if (currentPage !in spread.pages) currentPage = spread.first
+                onPageChanged(currentPage)
+                if (twoPage) {
+                    // Know the shape of the pages ahead so a scanned double page is shown alone before it is reached.
+                    for (p in spread.first - 2..spread.pages.last() + 4) if (p in pages.indices) onNeedSize(p)
+                }
+            }
+        }
+        LaunchedEffect(jumpEvents, spreads) {
+            jumpEvents.collect { p ->
+                if (p in pages.indices) {
+                    currentPage = p
+                    pagerState.scrollToPage(spreads.indexOfPage(p))
+                }
+            }
+        }
 
-    val contentScale = when (fitMode) {
-        FitMode.FIT -> ContentScale.Fit
-        FitMode.FILL_WIDTH -> ContentScale.FillWidth
-        FitMode.FILL_HEIGHT -> ContentScale.FillHeight
-    }
-    val pageContent: @Composable (Int) -> Unit = { index ->
-        ReaderPage(
-            url = pages[index],
-            contentScale = contentScale,
-            onTap = { offset, size, imageBounds ->
-                onTap(zoneOf(offset, size, vertical = mode == ReadingMode.VERTICAL, contentBounds = imageBounds))
-            },
-        )
-    }
+        val contentScale = when (fitMode) {
+            FitMode.FIT -> ContentScale.Fit
+            FitMode.FILL_WIDTH -> ContentScale.FillWidth
+            FitMode.FILL_HEIGHT -> ContentScale.FillHeight
+        }
+        val vertical = mode == ReadingMode.VERTICAL
+        val slotContent: @Composable (Int) -> Unit = { index ->
+            val spread = spreads[index]
+            if (!spread.isDouble) {
+                ReaderPage(
+                    url = pages[spread.first],
+                    contentScale = contentScale,
+                    alignment = Alignment.Center,
+                    onTap = { offset, size, bounds -> onTap(zoneOf(offset, size, vertical, bounds)) },
+                )
+            } else {
+                SpreadSlot(
+                    urls = (if (mode == ReadingMode.RTL) spread.pages.reversed() else spread.pages).map { pages[it] },
+                    contentScale = contentScale,
+                    onTap = onTap,
+                )
+            }
+        }
 
-    if (mode == ReadingMode.VERTICAL) {
-        VerticalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            beyondViewportPageCount = 1,
-            key = { it },
-        ) { pageContent(it) }
-    } else {
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier.fillMaxSize(),
-            beyondViewportPageCount = 1,
-            reverseLayout = mode == ReadingMode.RTL,
-            key = { it },
-        ) { pageContent(it) }
+        if (vertical) {
+            VerticalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                beyondViewportPageCount = 1,
+                key = { spreads[it].key },
+            ) { slotContent(it) }
+        } else {
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.fillMaxSize(),
+                beyondViewportPageCount = 1,
+                reverseLayout = mode == ReadingMode.RTL,
+                key = { spreads[it].key },
+            ) { slotContent(it) }
+        }
+    }
+}
+
+/** Two pages side by side meeting in the middle; tap zones are measured on the whole slot, not per page. */
+@Composable
+private fun SpreadSlot(urls: List<String>, contentScale: ContentScale, onTap: (TapZone) -> Unit) {
+    var slotSize by remember { mutableStateOf(IntSize.Zero) }
+    Row(Modifier.fillMaxSize().onSizeChanged { slotSize = it }) {
+        urls.forEachIndexed { slot, url ->
+            Box(Modifier.weight(1f).fillMaxHeight()) {
+                ReaderPage(
+                    url = url,
+                    contentScale = contentScale,
+                    alignment = if (slot == 0) Alignment.CenterEnd else Alignment.CenterStart,
+                    onTap = { offset, size, bounds ->
+                        val dx = slot * size.width.toFloat()
+                        onTap(zoneOf(offset + Offset(dx, 0f), slotSize, vertical = false, contentBounds = bounds.translate(dx, 0f)))
+                    },
+                )
+            }
+        }
     }
 }
 
 /** [onTap] receives the tap position, the viewport size and the displayed image bounds (viewport coordinates). */
 @Composable
-private fun ReaderPage(url: String, contentScale: ContentScale, onTap: (Offset, IntSize, Rect) -> Unit) {
+private fun ReaderPage(
+    url: String,
+    contentScale: ContentScale,
+    alignment: Alignment,
+    onTap: (Offset, IntSize, Rect) -> Unit,
+) {
     val context = LocalContext.current
     var retry by remember(url) { mutableIntStateOf(0) }
     var error by remember(url) { mutableStateOf<String?>(null) }
@@ -135,6 +202,7 @@ private fun ReaderPage(url: String, contentScale: ContentScale, onTap: (Offset, 
             modifier = Modifier.fillMaxSize(),
             state = imageState,
             contentScale = contentScale,
+            alignment = alignment,
             onClick = { offset -> onTap(offset, size, zoomableState.transformedContentBounds) },
         )
         if (!imageState.isImageDisplayed && error == null) {

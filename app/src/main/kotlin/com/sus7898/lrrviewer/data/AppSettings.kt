@@ -48,6 +48,10 @@ data class AppSettings(
     val gridMinColumnDp: Int = 120,
     val groupByTankoubon: Boolean = true,
     val categorySort: CategorySort = CategorySort.NAME,
+    /** Landscape: show two portrait pages side by side in the paged modes (LTR/RTL). */
+    val spreadInLandscape: Boolean = true,
+    /** With spreads on, keep the first page (cover) alone so pairs line up like a printed book. */
+    val spreadCoverAlone: Boolean = true,
     val autoCheckUpdates: Boolean = true,
     val lastUpdateCheck: Long = 0L,
 ) {

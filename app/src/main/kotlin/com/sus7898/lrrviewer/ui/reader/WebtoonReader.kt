@@ -6,19 +6,23 @@ import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.rememberTransformableState
 import androidx.compose.foundation.gestures.transformable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
@@ -32,13 +36,13 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
@@ -52,7 +56,10 @@ import com.sus7898.lrrviewer.data.PageImageStore
 import com.sus7898.lrrviewer.data.PageSize
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlin.math.abs
+import kotlinx.coroutines.launch
+import kotlin.math.roundToInt
+
+private const val WEBTOON_MAX_ZOOM = 3f
 
 /**
  * Continuous vertical scrolling (webtoon) reader.
@@ -61,6 +68,9 @@ import kotlin.math.abs
  * ([onNeedSize]); normal pages are laid out with their real aspect ratio (so Coil decodes to the composable
  * size and the scroll position does not jump); pages taller than [MAX_TILE_HEIGHT_PX] are split into bands
  * decoded with BitmapRegionDecoder, so an 800×20000 strip never becomes one bitmap.
+ *
+ * Zoom is a *layout* zoom: the column is laid out `scale` times wider than the viewport inside a horizontal
+ * scroller, so heights, scroll range, tap zones and tile sharpness all follow the zoom (no graphicsLayer).
  */
 @Composable
 fun WebtoonReader(
@@ -106,38 +116,57 @@ fun WebtoonReader(
             }
     }
 
-    var scale by remember { mutableFloatStateOf(1f) }
-    var offsetX by remember { mutableFloatStateOf(0f) }
-    var size by remember { mutableStateOf(IntSize.Zero) }
-    val transformState = rememberTransformableState { zoomChange, pan, _ ->
-        scale = (scale * zoomChange).coerceIn(1f, 3f)
-        val maxX = size.width * (scale - 1f) / 2f
-        offsetX = (offsetX + pan.x).coerceIn(-maxX, maxX)
-    }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val viewportWidthPx = constraints.maxWidth
+        val density = LocalDensity.current
+        val scope = rememberCoroutineScope()
+        var scale by remember { mutableFloatStateOf(1f) }
+        val hScroll = rememberScrollState()
+        var viewportSize by remember { mutableStateOf(IntSize.Zero) }
 
-    Box(
-        Modifier
-            .fillMaxSize()
-            .onSizeChanged { size = it }
-            .pointerInput(Unit) {
-                detectTapGestures(
-                    onTap = { offset -> onTap(zoneOf(offset, size, vertical = true)) },
-                    onDoubleTap = { scale = 1f; offsetX = 0f },
-                )
+        /** Zooms around the viewport centre: item heights change with the width, so re-anchor the list. */
+        fun applyZoom(zoomChange: Float) {
+            val old = scale
+            val new = (old * zoomChange).coerceIn(1f, WEBTOON_MAX_ZOOM)
+            if (new == old) return
+            val ratio = new / old
+            val index = listState.firstVisibleItemIndex
+            val offset = listState.firstVisibleItemScrollOffset
+            val centerY = listState.layoutInfo.viewportSize.height / 2f
+            val centerX = viewportWidthPx / 2f
+            scale = new
+            scope.launch {
+                listState.scrollToItem(index, (offset * ratio + centerY * (ratio - 1f)).roundToInt().coerceAtLeast(0))
+                hScroll.scrollTo(((hScroll.value + centerX) * ratio - centerX).roundToInt().coerceAtLeast(0))
             }
-            .transformable(transformState, canPan = { delta -> scale > 1f && abs(delta.x) > abs(delta.y) })
-            .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationX = offsetX
-            },
-    ) {
-        LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-            items(items, key = { it.key }) { item ->
-                when (item) {
-                    is WebtoonItem.Pending -> PendingPage()
-                    is WebtoonItem.Whole -> WholePage(url = pages[item.page], aspect = item.aspect)
-                    is WebtoonItem.Tile -> TileBand(store = store, url = pages[item.page], tile = item)
+        }
+        val transformState = rememberTransformableState { zoomChange, _, _ -> applyZoom(zoomChange) }
+
+        Box(
+            Modifier
+                .fillMaxSize()
+                .onSizeChanged { viewportSize = it }
+                .pointerInput(Unit) {
+                    detectTapGestures(
+                        onTap = { offset -> onTap(zoneOf(offset, viewportSize, vertical = true)) },
+                        onDoubleTap = { if (scale != 1f) applyZoom(1f / scale) else applyZoom(2f) },
+                    )
+                }
+                .transformable(transformState, canPan = { false })
+                .horizontalScroll(hScroll),
+        ) {
+            LazyColumn(
+                state = listState,
+                modifier = Modifier
+                    .requiredWidth(with(density) { (viewportWidthPx * scale).toDp() })
+                    .fillMaxHeight(),
+            ) {
+                items(items, key = { it.key }) { item ->
+                    when (item) {
+                        is WebtoonItem.Pending -> PendingPage()
+                        is WebtoonItem.Whole -> WholePage(url = pages[item.page], aspect = item.aspect)
+                        is WebtoonItem.Tile -> TileBand(store = store, url = pages[item.page], tile = item)
+                    }
                 }
             }
         }

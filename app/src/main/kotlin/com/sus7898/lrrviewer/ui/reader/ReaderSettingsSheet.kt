@@ -46,6 +46,8 @@ fun ReaderSettingsSheet(
             ChoiceChips("이미지 맞춤", FitMode.entries, settings.fitMode, { it.label }) { v -> onChange { it.copy(fitMode = v) } }
             ChoiceChips("배경", ReaderBackground.entries, settings.background, { it.label }) { v -> onChange { it.copy(background = v) } }
 
+            SwitchRow("가로 모드에서 양면 보기", settings.spreadInLandscape, "좌우 넘김 모드에서 세로 페이지 두 장을 나란히") { v -> onChange { it.copy(spreadInLandscape = v) } }
+            SwitchRow("표지는 한 장으로", settings.spreadCoverAlone, enabled = settings.spreadInLandscape) { v -> onChange { it.copy(spreadCoverAlone = v) } }
             SwitchRow("화면 탭으로 넘기기", settings.tapNavigation) { v -> onChange { it.copy(tapNavigation = v) } }
             SwitchRow("볼륨 키로 넘기기", settings.volumeKeyNavigation) { v -> onChange { it.copy(volumeKeyNavigation = v) } }
             SwitchRow("화면 항상 켜기", settings.keepScreenOn) { v -> onChange { it.copy(keepScreenOn = v) } }

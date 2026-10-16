@@ -188,10 +188,14 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             )
             else -> PagedReader(
                 pages = state.pages,
+                pageSizes = state.pageSizes,
                 initialPage = state.currentPage,
                 mode = readingMode,
                 fitMode = settings.fitMode,
+                twoPageLandscape = settings.spreadInLandscape,
+                coverAlone = settings.spreadCoverAlone,
                 jumpEvents = jumpEvents,
+                onNeedSize = vm::ensureSize,
                 onPageChanged = vm::onPageChanged,
                 onTap = ::onZoneTap,
             )

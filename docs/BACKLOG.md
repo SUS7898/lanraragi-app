@@ -53,7 +53,7 @@
 
 ## P1 — 체감이 큰 뷰어/서재 편의 기능
 
-### P1-1. 태블릿 가로 양면 보기(spread)
+### ✅ P1-1. 태블릿 가로 양면 보기(spread) — v0.1.3: `SpreadLayout.kt`, 설정 2개(가로 모드 양면 / 표지 단독)
 - 왜: Galaxy Tab 가로에서 한 장만 보면 여백이 크다. 만화는 두 쪽 펼침이 자연스럽다.
 - 어떻게: `PagedReader`에서 `spreads = buildSpreads(pages, aspectRatios)`로 (1장|2장) 묶음 리스트를 만들고
   `HorizontalPager(pageCount = spreads.size)`. RTL이면 Row 안에서 [오른쪽=앞 페이지]. 옵션: 표지 단독 시작
@@ -206,7 +206,7 @@
 - `ReaderScreen.onZoneTap` → `jumpEvents` → `WebtoonReader`의 `scrollToItem(p)`. 긴 스트립에서는 한 탭에 화면 몇 개분이 튄다.
 - 수정: 웹툰 모드에서는 `listState.animateScrollBy(±viewportHeight * 0.9f)`. 볼륨키도 동일.
 
-### S-4. 웹툰 줌이 `graphicsLayer` 스케일이라 레이아웃과 분리 (중) — v0.1.2 타일링 후에도 그대로(독립 작업)
+### ✅ S-4. 웹툰 줌이 `graphicsLayer` 스케일이라 레이아웃과 분리 (중) — v0.1.3: 레이아웃 줌(가로 스크롤 + 너비 배율)으로 교체
 - 확대 상태에서 탭 좌표·스크롤 범위가 실제 콘텐츠와 어긋난다. 타일링 재설계 때 `Modifier.zoomable`(telephoto) 또는
   항목 폭을 실제로 키우는 방식으로 바꾼다.
 

@@ -64,6 +64,8 @@ fun SettingsScreen(graph: AppGraph, onOpenCategoryOrder: () -> Unit) {
             ChoiceRow("읽기 방향", ReadingMode.entries, settings.readingMode, { it.label }) { v -> update { it.copy(readingMode = v) } }
             ChoiceRow("이미지 맞춤", FitMode.entries, settings.fitMode, { it.label }) { v -> update { it.copy(fitMode = v) } }
             ChoiceRow("배경색", ReaderBackground.entries, settings.background, { it.label }) { v -> update { it.copy(background = v) } }
+            SwitchRow("가로 모드에서 양면 보기", settings.spreadInLandscape, "좌우 넘김 모드에서 세로 페이지 두 장을 나란히 (가로로 긴 페이지는 한 장으로)") { v -> update { it.copy(spreadInLandscape = v) } }
+            SwitchRow("표지는 한 장으로", settings.spreadCoverAlone, "첫 페이지를 혼자 두어 책처럼 짝이 맞게 함", enabled = settings.spreadInLandscape) { v -> update { it.copy(spreadCoverAlone = v) } }
             SwitchRow("화면 탭으로 페이지 넘기기", settings.tapNavigation, "이미지 양쪽 30% 탭: 이전/다음 · 가운데 탭: 메뉴") { v -> update { it.copy(tapNavigation = v) } }
             SwitchRow("볼륨 키로 페이지 넘기기", settings.volumeKeyNavigation, "키보드(DeX)의 방향키·Page Up/Down·Space는 항상 동작") { v -> update { it.copy(volumeKeyNavigation = v) } }
             SwitchRow("읽는 동안 화면 항상 켜기", settings.keepScreenOn) { v -> update { it.copy(keepScreenOn = v) } }

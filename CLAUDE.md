@@ -60,7 +60,7 @@ app/src/main/kotlin/com/sus7898/lrrviewer/
   update/InstallResultReceiver.kt  설치 세션 결과 수신(사용자 확인 화면 띄움)
   ui/AppRoot.kt                타입 안전 라우트(SetupRoute/HomeRoute/ArchiveRoute/ReaderRoute) + 자동 업데이트 다이얼로그
   ui/home/, ui/library/, ui/history/, ui/detail/, ui/settings/ (CategoryOrderScreen = 드래그 순서 편집, sh.calvin.reorderable)
-  ui/reader/ReaderScreen.kt    호스트(크롬·시스템 UI·키) / PagedReader.kt / WebtoonReader.kt(+WebtoonLayout.kt 행·타일 계산) / ReaderGestures.kt / ReaderViewModel.kt(Deps)
+  ui/reader/ReaderScreen.kt    호스트(크롬·시스템 UI·키) / PagedReader.kt(+SpreadLayout.kt 양면 묶음) / WebtoonReader.kt(+WebtoonLayout.kt 행·타일 계산, 레이아웃 줌) / ReaderGestures.kt / ReaderViewModel.kt(Deps)
 app/src/test/…                 JVM 단위 테스트(MockWebServer 포함)
 .github/workflows/ci.yml       테스트·린트·디버그 APK
 .github/workflows/release.yml  태그 → 서명 릴리스 APK + 체크섬 + Trivy 게이트

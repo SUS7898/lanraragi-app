@@ -237,3 +237,15 @@
 - 크기를 모르는 행(Pending)이 실제 행(Whole/Tile 0)으로 바뀔 때 **key가 같아야** 첫 보이는 항목 앵커가 유지된다 (`"${page}_0"`).
   key가 바뀌면 LazyColumn은 인덱스로 되돌아가 위치가 흔들린다.
 - 치수를 읽는 동안 Coil에 실제 이미지를 요청하지 않는다(자리표시만). 치수 조회가 파일을 디스크 캐시에 받아두므로 이후 Coil 로드는 즉시다.
+
+### G-4. 양면 보기에서 페이저 인덱스 ≠ 페이지 인덱스
+- 치수가 도착하거나 회전하면 묶음(spread) 목록이 바뀌어 같은 페이지의 슬롯 번호가 달라진다. `LaunchedEffect(spreads)`에서
+  현재 **페이지**가 든 슬롯으로 `scrollToPage`한 뒤 `snapshotFlow { pagerState.currentPage }`를 다시 수집한다. 슬롯이 바뀌어도
+  현재 페이지가 그 슬롯 안에 있으면 currentPage를 바꾸지 않아야 진행률이 흔들리지 않는다.
+- 페이저 `key`는 슬롯의 페이지 목록(`"3_4"`)으로 두어 재묶음 시 콘텐츠가 올바른 슬롯에 다시 붙게 한다.
+
+### G-5. 웹툰 레이아웃 줌 — 재앵커와 제스처 분리
+- 너비 배율을 바꾸면 모든 행 높이가 비율대로 변한다 → `scrollToItem(firstIndex, offset×ratio + centerY×(ratio−1))`로 뷰포트 중심을
+  유지한다. 인덱스+오프셋은 다음 측정에서 적용되므로 재레이아웃 전에 호출해도 된다.
+- `transformable(canPan = { false })`로 핀치만 받고, 가로 이동은 `horizontalScroll`, 세로는 LazyColumn이 처리한다. `detectTransformGestures`는
+  한 손가락 이동까지 소비해 세로 스크롤을 막으므로 쓰지 않는다. 더블 탭은 `detectTapGestures(onDoubleTap)`.
