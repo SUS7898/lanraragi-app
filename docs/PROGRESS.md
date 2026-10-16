@@ -25,6 +25,7 @@
 - [x] v0.1.2 릴리스 게시 (Release run 37748445551)
 - [ ] v0.1.2 실기기 테스트 (§5 스트립 항목, §9c)
 - [x] v0.1.3: 양면 보기(`SpreadLayout`, 설정 2개) + 웹툰 레이아웃 줌(가로 스크롤 + 너비 배율, 재앵커) — 단위 테스트 47개, Lint 0 errors(로컬)
+- [x] v0.1.3 릴리스 게시 (Release run 38905048413)
 - [ ] v0.1.3 실기기 테스트 (§9d)
 - [ ] 실기기 피드백 반영 (제스처 감도, 웹툰 모드 줌, 탭존 비율 등)
 
@@ -58,3 +59,5 @@
 | 2026-10-07 | Release run 37626031611 (태그 v0.1.1) | ✅ lrr-viewer-v0.1.1.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 → 앱 내 업데이트로 설치 가능 |
 | 2026-10-08 | CI run 37711786273 + Security Scan run 37711786278 (커밋 fee68b5, v0.1.2 작업분) | ✅ 전부 성공 |
 | 2026-10-08 | Release run 37748445551 (태그 v0.1.2) | ✅ lrr-viewer-v0.1.2.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
+| 2026-10-16 | Security Scan run 38904416715 + CI run 38904416607 (커밋 c129813, v0.1.3 작업분) | ✅ 전부 성공 |
+| 2026-10-16 | Release run 38905048413 (태그 v0.1.3) | ✅ lrr-viewer-v0.1.3.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
