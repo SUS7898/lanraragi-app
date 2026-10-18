@@ -35,6 +35,7 @@
 - [x] v0.1.5 릴리스 게시 (Release run 39117277074)
 - [ ] v0.1.5 실기기 테스트 (§9f)
 - [x] v0.1.6: 앱 잠금(`AppLock`, BiometricPrompt, FragmentActivity) + FLAG_SECURE, 웹툰 자동 스크롤·간격, 서재 목록 보기 — 단위 테스트 61개, Lint 0 errors(로컬)
+- [x] v0.1.6 릴리스 게시 (Release run 39130863433)
 - [ ] v0.1.6 실기기 테스트 (§9g)
 - [ ] 실기기 피드백 반영 (제스처 감도, 웹툰 모드 줌, 탭존 비율 등)
 
@@ -74,3 +75,5 @@
 | 2026-10-17 | Release run 38954561711 (태그 v0.1.4) | ✅ lrr-viewer-v0.1.4.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
 | 2026-10-18 | CI run 39117051180 + Security Scan run 39117051199 (커밋 4b6210b, v0.1.5 작업분) | ✅ 전부 성공 |
 | 2026-10-18 | Release run 39117277074 (태그 v0.1.5) | ✅ lrr-viewer-v0.1.5.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
+| 2026-10-18 | CI run 39130473158 + Security Scan run 39130473171 (커밋 99ea56c, v0.1.6 작업분) | ✅ 전부 성공 |
+| 2026-10-18 | Release run 39130863433 (태그 v0.1.6) | ✅ lrr-viewer-v0.1.6.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
