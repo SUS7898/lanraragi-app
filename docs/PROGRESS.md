@@ -32,6 +32,7 @@
 - [ ] v0.1.4 실기기 테스트 (§9e)
 - [x] v0.1.5: 동기화(`data/sync`) + 백업, 카드 빠른 메뉴, 리더 별점 카드, 페이지 격자(P1-5), 자동완성·검색 기록(P1-7), 이어 읽기 줄,
       페이지 공유/저장/썸네일 지정(FileProvider `cache/share/` 재도입), 넘김 애니메이션 — 단위 테스트 56개, Lint 0 errors(로컬)
+- [x] v0.1.5 릴리스 게시 (Release run 39117277074)
 - [ ] v0.1.5 실기기 테스트 (§9f)
 - [ ] 실기기 피드백 반영 (제스처 감도, 웹툰 모드 줌, 탭존 비율 등)
 
@@ -69,3 +70,5 @@
 | 2026-10-16 | Release run 38905048413 (태그 v0.1.3) | ✅ lrr-viewer-v0.1.3.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
 | 2026-10-17 | CI run 38954107928 + Security Scan run 38954108084 (커밋 59b6c30, v0.1.4 작업분) | ✅ 전부 성공 |
 | 2026-10-17 | Release run 38954561711 (태그 v0.1.4) | ✅ lrr-viewer-v0.1.4.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
+| 2026-10-18 | CI run 39117051180 + Security Scan run 39117051199 (커밋 4b6210b, v0.1.5 작업분) | ✅ 전부 성공 |
+| 2026-10-18 | Release run 39117277074 (태그 v0.1.5) | ✅ lrr-viewer-v0.1.5.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
