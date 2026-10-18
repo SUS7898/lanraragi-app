@@ -203,6 +203,7 @@ dependencies {
     implementation(libs.androidx.room.ktx)
     ksp(libs.androidx.room.compiler)
     implementation(libs.reorderable)
+    implementation(libs.androidx.biometric)
     implementation(libs.okhttp)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.kotlinx.coroutines.android)

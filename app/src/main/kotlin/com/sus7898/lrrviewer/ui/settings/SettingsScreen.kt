@@ -81,6 +81,7 @@ fun SettingsScreen(graph: AppGraph, onOpenCategoryOrder: () -> Unit) {
         item {
             SectionTitle("서재")
             SwitchRow("탄코본(묶음)으로 그룹화", settings.groupByTankoubon, "묶음에 속한 아카이브를 한 항목으로 표시") { v -> update { it.copy(groupByTankoubon = v) } }
+            SwitchRow("목록으로 보기", settings.libraryListView, "표지 격자 대신 제목·태그가 보이는 목록 (서재의 보기 칩으로도 전환)") { v -> update { it.copy(libraryListView = v) } }
             SwitchRow("'이어 읽기' 줄 표시", settings.showContinueReading, "필터 없는 서재 맨 위에 다 읽지 않은 작품") { v -> update { it.copy(showContinueReading = v) } }
             StepperRow("썸네일 최소 너비 (dp)", settings.gridMinColumnDp, 80..240, step = 20, subtitle = "작을수록 한 줄에 더 많이 표시") { v -> update { it.copy(gridMinColumnDp = v) } }
             ChoiceRow(
@@ -105,6 +106,11 @@ fun SettingsScreen(graph: AppGraph, onOpenCategoryOrder: () -> Unit) {
         item {
             SectionTitle("캐시")
             CacheSection(graph = graph, settings = settings, onCacheSize = { v -> update { it.copy(cacheSizeMb = v) } })
+        }
+
+        item {
+            SectionTitle("보안")
+            SecuritySection(graph = graph, settings = settings)
         }
 
         item {

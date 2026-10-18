@@ -73,3 +73,9 @@ fun sampleSizeFor(sourceWidth: Int, targetWidth: Int): Int {
     while (sourceWidth / (sample * 2) >= targetWidth) sample *= 2
     return sample
 }
+
+/** Auto-scroll speed: step 1..10 → 30..300 dp per second. */
+fun autoScrollPxPerSecond(speedStep: Int, density: Float): Float = speedStep.coerceIn(1, 10) * 30f * density
+
+/** True when [index] is the last row of its page (a page gap goes below it, never between the tiles of one page). */
+fun List<WebtoonItem>.isPageEnd(index: Int): Boolean = getOrNull(index + 1)?.page != getOrNull(index)?.page

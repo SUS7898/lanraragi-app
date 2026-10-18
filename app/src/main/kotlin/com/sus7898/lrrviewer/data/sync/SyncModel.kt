@@ -12,8 +12,8 @@ import kotlinx.serialization.Serializable
 
 /**
  * The settings that travel between devices. Deliberately excluded: server URL and API key (secret; a phone
- * may use the LAN address and a tablet the HTTPS one), cache size, grid width and brightness (per device),
- * update/sync bookkeeping.
+ * may use the LAN address and a tablet the HTTPS one), cache size, grid width, list/grid view and brightness
+ * (per device), app lock / hide-in-recents (security, per device), update/sync bookkeeping.
  */
 @Serializable
 data class SyncedSettings(
@@ -37,6 +37,8 @@ data class SyncedSettings(
     val showContinueReading: Boolean = true,
     val allowCleartext: Boolean = true,
     val autoCheckUpdates: Boolean = true,
+    val webtoonGapDp: Int = 0,
+    val autoScrollSpeed: Int = 3,
 ) {
     fun applyTo(s: AppSettings): AppSettings = s.copy(
         readingMode = enumOr(readingMode, s.readingMode),
@@ -59,6 +61,8 @@ data class SyncedSettings(
         showContinueReading = showContinueReading,
         allowCleartext = allowCleartext,
         autoCheckUpdates = autoCheckUpdates,
+        webtoonGapDp = webtoonGapDp.coerceIn(0, 32),
+        autoScrollSpeed = autoScrollSpeed.coerceIn(1, 10),
     )
 
     companion object {
@@ -83,6 +87,8 @@ data class SyncedSettings(
             showContinueReading = s.showContinueReading,
             allowCleartext = s.allowCleartext,
             autoCheckUpdates = s.autoCheckUpdates,
+            webtoonGapDp = s.webtoonGapDp,
+            autoScrollSpeed = s.autoScrollSpeed,
         )
 
         private inline fun <reified E : Enum<E>> enumOr(name: String, fallback: E): E =

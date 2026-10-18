@@ -90,6 +90,14 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 - **빠른 메뉴·리더 내 평점**: 서재 카드 길게 누르기 → 별점/즐겨찾기/NEW/처음부터 읽기/상세, 리더 마지막 페이지에 별점 카드.
   별점 쓰기는 `LrrApi.setRating()` 하나로 통일(최신 메타데이터를 읽고 title/tags/summary를 함께 PUT).
 - **페이지 길게 누르기**: 공유(FileProvider, `cache/share/`만 노출), 기기에 저장(MediaStore, Android 10+, 권한 없음), 썸네일로 지정(🔑 PUT thumbnail).
+- **앱 잠금(P2-2, v0.1.6)**: `AppLock`(순수 상태 + `shouldLock` 테스트) — 콜드 스타트 시 잠금, 백그라운드 후 유예 시간(즉시/1/5/30분)이 지나면 재잠금.
+  잠금 화면은 전체를 덮는 불투명 컴포저블 + `BiometricPrompt`(BIOMETRIC_WEAK | DEVICE_CREDENTIAL, API 28+ 지원 조합). 켤 때 한 번 인증해
+  이 기기에서 풀 수 있음을 확인한다. 화면 잠금이 사라진 기기에서는 가두지 않고 연다(fail-open, 개인용 뷰어의 위협 모델). 잠금 중 하드웨어 키
+  페이지 넘김 차단. `MainActivity`는 BiometricPrompt 때문에 `FragmentActivity`. "최근 앱에서 숨기기" = `FLAG_SECURE`. 둘 다 동기화 제외.
+- **웹툰 자동 스크롤**: 하단 바 ▶ → 메뉴가 숨겨진 동안만 `listState.scroll(Default) { withFrameNanos 루프로 scrollBy }`. 손가락 드래그(UserInput 우선순위)가
+  블록을 취소하면 손을 뗀 뒤 0.7초 후 재개, 끝에 닿으면 멈추고 메뉴(마지막 페이지 카드) 표시. 속도 1~10 = 30~300dp/s.
+- **웹툰 페이지 간격**: 페이지의 마지막 행 아래에만 여백(`isPageEnd`) — 한 페이지의 타일 사이에는 넣지 않는다.
+- **서재 목록 보기**: 같은 그리드를 `GridCells.Fixed(1)` + `ArchiveListRow`(표지·제목·작가/시리즈·페이지/진행률·★·♥)로. 기기별 설정(동기화 제외).
 - 의도적으로 하지 않은 것: 멀티모듈, DI 프레임워크, `strings.xml` 분리(개인용·한국어 단일; 공개 배포 시 재검토).
 
 ## 4. LANraragi API 메모 (소스 `tools/openapi.yaml`, `Controller/Api/*.pm` 확인)
@@ -130,6 +138,7 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 v0.1.2: 페이지 치수 캐시 · 웹툰 세로 스트립 타일링(2048px 밴드, 영역 디코딩) · 실제 종횡비 레이아웃 · 웹툰 모드 제안 스낵바.
 v0.1.3: 가로 모드 양면 보기(표지 단독·가로 페이지 단독 옵션) · 웹툰 레이아웃 줌(1~3×, 더블 탭 2×).
 v0.1.4: 마지막 페이지에서 다음 작품 카드/넘김 · 리더 밝기(1~100%) · 색 필터(흑백/세피아/따뜻하게).
+v0.1.6: 앱 잠금·최근 앱 숨기기 · 웹툰 자동 스크롤·페이지 간격 · 서재 목록 보기.
 v0.1.5: 동기화 파일·백업 · 카드 빠른 메뉴 · 리더 마지막 페이지 별점 · 페이지 격자 · 검색 자동완성/기록 · 이어 읽기 줄 · 페이지 공유/저장/썸네일 지정 · 넘김 애니메이션.
 
 ## 6. 자체 업데이트 설계

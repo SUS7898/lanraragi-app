@@ -49,6 +49,12 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         val ANIMATE_PAGE_TURN = booleanPreferencesKey("animate_page_turn")
         val SHOW_CONTINUE = booleanPreferencesKey("show_continue_reading")
         val RECENT_SEARCHES = stringPreferencesKey("recent_searches")
+        val WEBTOON_GAP = intPreferencesKey("webtoon_gap_dp")
+        val AUTO_SCROLL_SPEED = intPreferencesKey("auto_scroll_speed")
+        val LIBRARY_LIST = booleanPreferencesKey("library_list_view")
+        val APP_LOCK = booleanPreferencesKey("app_lock")
+        val APP_LOCK_GRACE = intPreferencesKey("app_lock_grace_sec")
+        val HIDE_IN_RECENTS = booleanPreferencesKey("hide_in_recents")
         val AUTO_UPDATE = booleanPreferencesKey("auto_check_updates")
         val LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
         val SYNC_FILE_URI = stringPreferencesKey("sync_file_uri")
@@ -115,6 +121,12 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         colorFilter = enumOrDefault(this[Keys.COLOR_FILTER], ColorFilterMode.NONE),
         animatePageTurn = this[Keys.ANIMATE_PAGE_TURN] ?: true,
         showContinueReading = this[Keys.SHOW_CONTINUE] ?: true,
+        webtoonGapDp = this[Keys.WEBTOON_GAP] ?: 0,
+        autoScrollSpeed = this[Keys.AUTO_SCROLL_SPEED] ?: 3,
+        libraryListView = this[Keys.LIBRARY_LIST] ?: false,
+        appLock = this[Keys.APP_LOCK] ?: false,
+        appLockGraceSec = this[Keys.APP_LOCK_GRACE] ?: 0,
+        hideInRecents = this[Keys.HIDE_IN_RECENTS] ?: false,
         recentSearches = this[Keys.RECENT_SEARCHES].orEmpty().split('\n').filter { it.isNotBlank() }.take(MAX_RECENT_SEARCHES),
         autoCheckUpdates = this[Keys.AUTO_UPDATE] ?: true,
         lastUpdateCheck = this[Keys.LAST_UPDATE_CHECK] ?: 0L,
@@ -149,6 +161,12 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         this[Keys.COLOR_FILTER] = s.colorFilter.name
         this[Keys.ANIMATE_PAGE_TURN] = s.animatePageTurn
         this[Keys.SHOW_CONTINUE] = s.showContinueReading
+        this[Keys.WEBTOON_GAP] = s.webtoonGapDp.coerceIn(0, 32)
+        this[Keys.AUTO_SCROLL_SPEED] = s.autoScrollSpeed.coerceIn(1, 10)
+        this[Keys.LIBRARY_LIST] = s.libraryListView
+        this[Keys.APP_LOCK] = s.appLock
+        this[Keys.APP_LOCK_GRACE] = s.appLockGraceSec.coerceIn(0, 3600)
+        this[Keys.HIDE_IN_RECENTS] = s.hideInRecents
         this[Keys.RECENT_SEARCHES] = s.recentSearches.map { it.replace('\n', ' ').trim() }.filter { it.isNotEmpty() }
             .distinct().take(MAX_RECENT_SEARCHES).joinToString("\n")
         this[Keys.AUTO_UPDATE] = s.autoCheckUpdates

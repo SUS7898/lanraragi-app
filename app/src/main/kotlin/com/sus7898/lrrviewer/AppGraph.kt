@@ -104,6 +104,9 @@ class AppGraph(private val app: Application) {
     /** Archive ids of the list the reader was opened from (library results, tankoubon, history): "next archive" source. */
     val readerQueue = MutableStateFlow<List<String>>(emptyList())
 
+    /** App lock (biometric / screen lock) state; see AppLock and ui/lock/LockScreen. */
+    val appLock = AppLock(settingsState)
+
     /** A tag search requested from another screen; the library consumes and clears it. */
     val pendingLibrarySearch = MutableStateFlow<String?>(null)
 }

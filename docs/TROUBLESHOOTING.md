@@ -271,3 +271,13 @@
   SecurityException. 쓰기는 `openOutputStream(uri, "wt")`(잘라내기), 일부 제공자는 "w"만 받으므로 대체 시도.
 - Google Drive 등 클라우드 제공자는 파일 반영이 늦을 수 있다(오프라인 캐시). 병합이 마지막 쓰기 승리라 늦게 도착한 쪽도 안전하게 합쳐진다.
 - JUnit 테스트 메서드 이름(백틱)에 `;`를 넣으면 `Name contains illegal characters` 컴파일 오류(JVM 이름 제약).
+
+### G-10. BiometricPrompt 조합과 FragmentActivity
+- `BiometricPrompt`는 `FragmentActivity`가 필요 → `MainActivity : FragmentActivity()`(ComponentActivity 하위라 `setContent`·`enableEdgeToEdge` 그대로).
+- 허용 인증 조합: `BIOMETRIC_STRONG | DEVICE_CREDENTIAL`은 API 28~29에서 **미지원**(IllegalArgumentException). `BIOMETRIC_WEAK | DEVICE_CREDENTIAL`은 전 버전 지원.
+  DEVICE_CREDENTIAL을 넣으면 `setNegativeButtonText`를 쓰면 안 된다(예외).
+- 라이브러리가 `USE_BIOMETRIC`·`USE_FINGERPRINT`(일반 권한, 사용자 허락 불필요)를 매니페스트에 병합한다.
+
+### G-11. 자동 스크롤과 사용자 드래그
+- 자동 스크롤을 프레임마다 `scrollBy`를 따로 부르면 사용자 플링과 번갈아 싸운다. `listState.scroll(MutatePriority.Default) { 루프 }` 한 블록으로 돌리면
+  사용자 드래그(UserInput, 더 높음)가 블록을 `CancellationException`으로 끊는다 → 코루틴이 살아 있으면(`isActive`) 잡고 `isScrollInProgress == false`를 기다려 재개.

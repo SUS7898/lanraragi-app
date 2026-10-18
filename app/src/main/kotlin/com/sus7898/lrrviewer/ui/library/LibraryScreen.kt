@@ -19,6 +19,8 @@ import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.History
+import androidx.compose.material.icons.automirrored.filled.ViewList
+import androidx.compose.material.icons.filled.GridView
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Search
@@ -165,6 +167,8 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit, onOpenReader
                 onQuery = vm::setQuery,
                 onToggleFavorites = vm::toggleFavoritesOnly,
                 onMinRating = vm::setMinRating,
+                listView = settings.libraryListView,
+                onToggleView = { scope.launch { graph.settings.edit { it.copy(libraryListView = !it.libraryListView) } } },
             )
 
             PullToRefreshBox(
@@ -177,7 +181,7 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit, onOpenReader
                     state.items.isEmpty() && state.error != null -> ErrorView(state.error!!, onRetry = { vm.refresh() })
                     state.items.isEmpty() -> EmptyView(if (state.hasActiveFilters) "조건에 맞는 항목이 없습니다 (뒤로 가기: 필터 초기화)" else "결과가 없습니다")
                     else -> LazyVerticalGrid(
-                        columns = GridCells.Adaptive(minSize = settings.gridMinColumnDp.dp),
+                        columns = if (settings.libraryListView) GridCells.Fixed(1) else GridCells.Adaptive(minSize = settings.gridMinColumnDp.dp),
                         state = gridState,
                         contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 4.dp, bottom = 96.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -197,16 +201,27 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit, onOpenReader
                             }
                         }
                         items(state.items, key = { it.arcid }) { archive ->
-                            ArchiveCard(
-                                archive = archive,
-                                thumbnailUrl = graph.api.thumbnailUrl(archive.arcid),
-                                favorite = archive.arcid in state.favoriteIds,
-                                onClick = {
-                                    graph.readerQueue.value = state.items.filter { !it.isTankoubon }.map { it.arcid }
-                                    onOpenArchive(archive.arcid)
-                                },
-                                onLongClick = { quickArchiveId = archive.arcid },
-                            )
+                            val open = {
+                                graph.readerQueue.value = state.items.filter { !it.isTankoubon }.map { it.arcid }
+                                onOpenArchive(archive.arcid)
+                            }
+                            if (settings.libraryListView) {
+                                ArchiveListRow(
+                                    archive = archive,
+                                    thumbnailUrl = graph.api.thumbnailUrl(archive.arcid),
+                                    favorite = archive.arcid in state.favoriteIds,
+                                    onClick = open,
+                                    onLongClick = { quickArchiveId = archive.arcid },
+                                )
+                            } else {
+                                ArchiveCard(
+                                    archive = archive,
+                                    thumbnailUrl = graph.api.thumbnailUrl(archive.arcid),
+                                    favorite = archive.arcid in state.favoriteIds,
+                                    onClick = open,
+                                    onLongClick = { quickArchiveId = archive.arcid },
+                                )
+                            }
                         }
                         if (state.loadingMore) {
                             item(span = { GridItemSpan(maxLineSpan) }) {
@@ -264,6 +279,8 @@ private fun FilterRow(
     onQuery: (SearchQuery) -> Unit,
     onToggleFavorites: () -> Unit,
     onMinRating: (Int) -> Unit,
+    listView: Boolean = false,
+    onToggleView: () -> Unit = {},
 ) {
     val q = state.query
     var categoryMenu by remember { mutableStateOf(false) }
@@ -281,6 +298,13 @@ private fun FilterRow(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
+        AssistChip(
+            onClick = onToggleView,
+            label = { Text(if (listView) "목록" else "격자") },
+            leadingIcon = {
+                Icon(if (listView) Icons.AutoMirrored.Filled.ViewList else Icons.Filled.GridView, contentDescription = "보기 방식 전환", Modifier.size(18.dp))
+            },
+        )
         Box {
             AssistChip(
                 onClick = { categoryMenu = true },

@@ -41,7 +41,7 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
 ```
 app/src/main/kotlin/com/sus7898/lrrviewer/
   App.kt, AppGraph.kt          Application + 수동 DI(서비스 로케이터)
-  MainActivity.kt              Compose 호스트, 볼륨키 → ReaderKeyEvents
+  MainActivity.kt              Compose 호스트(FragmentActivity), 볼륨키 → ReaderKeyEvents, 잠금 오버레이·FLAG_SECURE, 시작/종료 시 동기화
   data/AppSettings.kt          설정 데이터 클래스 + enum (ReadingMode 등)
   data/SettingsRepository.kt   DataStore 저장, API 키는 SecureStore로 암호화
   data/SecureStore.kt          Android Keystore AES-GCM
@@ -50,6 +50,7 @@ app/src/main/kotlin/com/sus7898/lrrviewer/
   data/CategoryOrderRepository.kt    카테고리 수동 순서 (Room category_order), data/CategorySorting.kt 정렬 모드·자연수 정렬
   data/FavoritesRepository.kt        즐겨찾기 = 서버 북마크 카테고리(멤버 집합 공유, 🔑 토글)
   CrashLog.kt                        마지막 미처리 예외를 files/crash/에 저장 (설정 → 정보)
+  AppLock.kt, ui/lock/LockScreen.kt  앱 잠금 상태·BiometricPrompt 잠금 화면 (MainActivity는 FragmentActivity), 설정 SecuritySection
   data/sync/SyncModel.kt, SyncManager.kt  기기 간 동기화 파일(SAF) — 스냅샷·병합 규칙(SyncMerge, 순수 함수)·백업. 설정 화면 SyncSection
   data/PageExport.kt                 페이지 공유(FileProvider cache/share/)·저장(MediaStore)
   data/PageImageStore.kt             페이지 파일 = Coil 디스크 캐시: 프리페치(DiskOnlyDecoder)·치수(inJustDecodeBounds)·영역 디코딩(타일 LRU)

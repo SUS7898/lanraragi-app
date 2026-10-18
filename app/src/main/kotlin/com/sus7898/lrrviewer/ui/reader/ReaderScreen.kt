@@ -19,6 +19,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Pause
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Save
@@ -94,6 +96,8 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
     /** 0-based page whose long-press menu is open. */
     var pageMenu by remember { mutableStateOf<Int?>(null) }
     var showGrid by remember { mutableStateOf(false) }
+    /** Webtoon auto-scroll is on; it runs only while the menus are hidden (tapping the middle pauses it). */
+    var autoScrolling by rememberSaveable { mutableStateOf(false) }
     /** Page index to show (paged modes) or scroll to (webtoon). */
     val jumpEvents = remember { MutableSharedFlow<Int>(extraBufferCapacity = 8) }
     /** Webtoon only: scroll by this fraction of the viewport height (negative = up). */
@@ -230,6 +234,10 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                     onPageChanged = vm::onPageChanged,
                     onTap = ::onZoneTap,
                     onLongPress = { pageMenu = it },
+                    gapDp = settings.webtoonGapDp,
+                    autoScroll = autoScrolling && !chromeVisible,
+                    autoScrollSpeed = settings.autoScrollSpeed,
+                    onAutoScrollEnd = { autoScrolling = false; chromeVisible = true },
                 )
                 else -> PagedReader(
                     pages = state.pages,
@@ -334,6 +342,12 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                 onSettings = { showSettings = true },
                 onToc = { showToc = true },
                 onGrid = { showGrid = true; vm.preparePageThumbnails() },
+                showAutoScroll = readingMode == ReadingMode.WEBTOON,
+                autoScrolling = autoScrolling,
+                onToggleAutoScroll = {
+                    autoScrolling = !autoScrolling
+                    if (autoScrolling) chromeVisible = false
+                },
                 onCycleMode = {
                     // Quick toggle applies to this archive only; the settings sheet changes the global default.
                     val modes = ReadingMode.entries
@@ -450,6 +464,9 @@ private fun ReaderBottomBar(
     onToc: () -> Unit,
     onGrid: () -> Unit,
     onCycleMode: () -> Unit,
+    showAutoScroll: Boolean = false,
+    autoScrolling: Boolean = false,
+    onToggleAutoScroll: () -> Unit = {},
 ) {
     Surface(color = Color.Black.copy(alpha = 0.65f), contentColor = Color.White, modifier = Modifier.fillMaxWidth()) {
         Column(
@@ -476,6 +493,11 @@ private fun ReaderBottomBar(
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 IconButton(onClick = onCycleMode) { Icon(Icons.Filled.SwapHoriz, contentDescription = "이 작품의 읽기 방향 전환: ${mode.label}") }
+                if (showAutoScroll) {
+                    IconButton(onClick = onToggleAutoScroll) {
+                        Icon(if (autoScrolling) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (autoScrolling) "자동 스크롤 끄기" else "자동 스크롤")
+                    }
+                }
                 IconButton(onClick = onGrid) { Icon(Icons.Filled.GridView, contentDescription = "페이지 목록") }
                 IconButton(onClick = onToc, enabled = hasToc) { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "목차") }
                 IconButton(onClick = onSettings) { Icon(Icons.Filled.Tune, contentDescription = "뷰어 설정") }

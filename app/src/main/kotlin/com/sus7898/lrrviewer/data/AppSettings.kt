@@ -73,6 +73,18 @@ data class AppSettings(
     val animatePageTurn: Boolean = true,
     /** Show the "이어 읽기" row at the top of an unfiltered library. */
     val showContinueReading: Boolean = true,
+    /** Webtoon: blank space between pages, in dp (0 = seamless strip). */
+    val webtoonGapDp: Int = 0,
+    /** Webtoon auto-scroll speed step 1..10 (see `autoScrollPxPerSecond`). */
+    val autoScrollSpeed: Int = 3,
+    /** Library as a list (thumbnail + details per row) instead of the cover grid. Per device. */
+    val libraryListView: Boolean = false,
+    /** Ask for fingerprint / face / screen lock when the app is opened. Per device, never synced. */
+    val appLock: Boolean = false,
+    /** Seconds the app may stay in the background before it locks again (0 = immediately). */
+    val appLockGraceSec: Int = 0,
+    /** FLAG_SECURE: blank thumbnail in recent apps and no screenshots. Per device, never synced. */
+    val hideInRecents: Boolean = false,
     /** Most recent first, at most [MAX_RECENT_SEARCHES]. */
     val recentSearches: List<String> = emptyList(),
     val autoCheckUpdates: Boolean = true,

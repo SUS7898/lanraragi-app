@@ -55,6 +55,8 @@ fun ReaderSettingsSheet(
             ChoiceChips("배경", ReaderBackground.entries, settings.background, { it.label }) { v -> onChange { it.copy(background = v) } }
             ChoiceChips("색 필터", ColorFilterMode.entries, settings.colorFilter, { it.label }) { v -> onChange { it.copy(colorFilter = v) } }
             BrightnessRow(settings.readerBrightness) { v -> onChange { it.copy(readerBrightness = v) } }
+            ChoiceChips("웹툰 페이지 간격", listOf(0, 4, 8, 16), settings.webtoonGapDp, { if (it == 0) "없음" else "${it}dp" }) { v -> onChange { it.copy(webtoonGapDp = v) } }
+            StepperRow("웹툰 자동 스크롤 속도", settings.autoScrollSpeed, 1..10, subtitle = "하단 바 ▶ 버튼으로 시작, 가운데 탭으로 멈춤") { v -> onChange { it.copy(autoScrollSpeed = v) } }
 
             SwitchRow("가로 모드에서 양면 보기", settings.spreadInLandscape, "좌우 넘김 모드에서 세로 페이지 두 장을 나란히") { v -> onChange { it.copy(spreadInLandscape = v) } }
             SwitchRow("표지는 한 장으로", settings.spreadCoverAlone, enabled = settings.spreadInLandscape) { v -> onChange { it.copy(spreadCoverAlone = v) } }

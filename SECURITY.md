@@ -48,5 +48,12 @@ Dependency Review. `release.yml`은 Trivy에서 수정판이 있는 CRITICAL/HIG
 - **저장**: MediaStore(Android 10+)로 Pictures/LRR Viewer에만 쓰며 저장소 권한을 요청하지 않는다(Android 9는 저장 비활성).
 - 새 서버 쓰기(썸네일 지정, 별점)는 모두 기존 인터셉터를 거쳐 API 키가 설정한 서버 호스트에만 간다.
 
+## v0.1.6 변경의 보안 검토 (2026-10-18)
+- **앱 잠금**: 앱 화면을 가리는 UI 잠금이다(데이터 암호화가 아님). API 키는 원래대로 Keystore로 암호화되어 있다. 화면 잠금이 사라진 기기에서는
+  사용자를 가두지 않도록 잠금 화면이 바로 열린다(fail-open) — 기기 화면 잠금이 이미 1차 방어선이라는 전제. 잠금 중 하드웨어 키 입력 차단.
+- 새 권한 `USE_BIOMETRIC`/`USE_FINGERPRINT`(androidx.biometric 병합, 일반 권한). 새 의존성 `androidx.biometric:biometric:1.1.0`(Google, 네트워크 없음).
+- **최근 앱에서 숨기기**: `FLAG_SECURE`로 최근 앱 미리보기와 스크린샷을 막는다(mobsfscan INFO "스크린샷 방지" 항목을 선택적으로 해소).
+- 잠금·숨기기 설정은 동기화 파일에 넣지 않는다(기기별 보안 설정).
+
 ## 취약점 제보
 이 저장소의 Security Advisories(비공개) 또는 이슈로 제보해 주세요. 영향 범위와 재현 방법을 포함하면 좋습니다.

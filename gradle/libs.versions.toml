@@ -15,6 +15,7 @@ telephoto = "0.16.0"
 ksp = "2.1.21-2.0.1"
 room = "2.7.1"
 reorderable = "3.1.0"
+biometric = "1.1.0"
 junit = "4.13.2"
 
 [libraries]
@@ -43,6 +44,7 @@ androidx-room-runtime = { group = "androidx.room", name = "room-runtime", versio
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
+androidx-biometric = { group = "androidx.biometric", name = "biometric", version.ref = "biometric" }
 junit = { group = "junit", name = "junit", version.ref = "junit" }
 
 [plugins]

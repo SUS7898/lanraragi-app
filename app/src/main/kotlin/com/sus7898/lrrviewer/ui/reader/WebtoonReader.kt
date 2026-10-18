@@ -20,7 +20,13 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.MutatePriority
+import androidx.compose.runtime.withFrameNanos
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.isActive
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
@@ -84,6 +90,10 @@ fun WebtoonReader(
     onPageChanged: (Int) -> Unit,
     onTap: (TapZone) -> Unit,
     onLongPress: (Int) -> Unit = {},
+    gapDp: Int = 0,
+    autoScroll: Boolean = false,
+    autoScrollSpeed: Int = 3,
+    onAutoScrollEnd: () -> Unit = {},
 ) {
     val items = remember(pages.size, pageSizes) { buildWebtoonItems(pages.size, pageSizes) }
     val listState = rememberLazyListState(
@@ -120,6 +130,29 @@ fun WebtoonReader(
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val viewportWidthPx = constraints.maxWidth
         val density = LocalDensity.current
+
+        // Auto-scroll: one long scroll block that a finger drag (higher priority) cancels; resume once the user lets go.
+        LaunchedEffect(autoScroll, autoScrollSpeed) {
+            if (!autoScroll) return@LaunchedEffect
+            val pxPerSecond = autoScrollPxPerSecond(autoScrollSpeed, density.density)
+            while (isActive) {
+                snapshotFlow { listState.isScrollInProgress }.first { !it }
+                try {
+                    listState.scroll(MutatePriority.Default) {
+                        var last = withFrameNanos { it }
+                        while (listState.canScrollForward) {
+                            val now = withFrameNanos { it }
+                            scrollBy((now - last) / 1_000_000_000f * pxPerSecond)
+                            last = now
+                        }
+                    }
+                    if (!listState.canScrollForward) { onAutoScrollEnd(); break }
+                } catch (e: CancellationException) {
+                    if (!isActive) throw e
+                    delay(700)
+                }
+            }
+        }
         val scope = rememberCoroutineScope()
         var scale by remember { mutableFloatStateOf(1f) }
         val hScroll = rememberScrollState()
@@ -167,11 +200,13 @@ fun WebtoonReader(
                     .requiredWidth(with(density) { (viewportWidthPx * scale).toDp() })
                     .fillMaxHeight(),
             ) {
-                items(items, key = { it.key }) { item ->
-                    when (item) {
-                        is WebtoonItem.Pending -> PendingPage()
-                        is WebtoonItem.Whole -> WholePage(url = pages[item.page], aspect = item.aspect)
-                        is WebtoonItem.Tile -> TileBand(store = store, url = pages[item.page], tile = item)
+                itemsIndexed(items, key = { _, it -> it.key }) { index, item ->
+                    Box(if (gapDp > 0 && items.isPageEnd(index)) Modifier.padding(bottom = gapDp.dp) else Modifier) {
+                        when (item) {
+                            is WebtoonItem.Pending -> PendingPage()
+                            is WebtoonItem.Whole -> WholePage(url = pages[item.page], aspect = item.aspect)
+                            is WebtoonItem.Tile -> TileBand(store = store, url = pages[item.page], tile = item)
+                        }
                     }
                 }
             }
