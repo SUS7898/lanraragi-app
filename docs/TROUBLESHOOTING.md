@@ -259,3 +259,15 @@
 ### G-7. "다음 작품" 전환은 pop + navigate가 아닌 popUpTo inclusive
 - `navigate(ReaderRoute(next)) { popUpTo<ReaderRoute> { inclusive = true } }`로 현재 리더를 백스택에서 빼고 새 리더를 넣어야 뒤로 가기가
   상세/서재로 바로 돌아간다. ViewModel key가 `reader_$arcId`라 새 리더는 새 VM을 만들고, 이전 VM의 `onCleared`가 진행률을 저장한다.
+
+### G-8. 페이지 썸네일: no_fallback 없이 부르면 자리표시가 캐시된다
+- `GET /api/archives/{id}/thumbnail?page=N`은 썸네일이 아직 없으면 **자리표시 이미지(200)** 를 준다 → Coil이 그 URL로 디스크 캐시에 저장해
+  나중에 진짜 썸네일이 생겨도 계속 자리표시가 보인다. `no_fallback=true`는 대신 202 + JSON을 준다(2xx라 Coil 페처가 본문을 캐시에 쓴 뒤
+  디코딩에서 실패). 그래서 ① 격자를 열면 `POST …/files/thumbnails`로 생성 작업을 걸고 minion 완료를 기다린 뒤에만 URL을 쓰고,
+  ② 디코딩 실패 시 `PageImageStore.evict(url)`로 디스크·메모리 캐시에서 지운다.
+
+### G-9. SAF 동기화 파일
+- `ActivityResultContracts.CreateDocument/OpenDocument`로 받은 URI에 `takePersistableUriPermission(READ|WRITE)` — 이걸 안 하면 앱 재시작 후
+  SecurityException. 쓰기는 `openOutputStream(uri, "wt")`(잘라내기), 일부 제공자는 "w"만 받으므로 대체 시도.
+- Google Drive 등 클라우드 제공자는 파일 반영이 늦을 수 있다(오프라인 캐시). 병합이 마지막 쓰기 승리라 늦게 도착한 쪽도 안전하게 합쳐진다.
+- JUnit 테스트 메서드 이름(백틱)에 `;`를 넣으면 `Name contains illegal characters` 컴파일 오류(JVM 이름 제약).

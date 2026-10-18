@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.sus7898.lrrviewer.ui.AppRoot
 import com.sus7898.lrrviewer.ui.theme.LrrTheme
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
 
@@ -26,6 +27,24 @@ class MainActivity : ComponentActivity() {
                     AppRoot(graph = graph, settings = settings)
                 }
             }
+        }
+    }
+
+    // Sync with the linked file when the app comes to the foreground (pull the other device's changes) and
+    // when it leaves it (push ours). Starts are throttled so rotating or a quick app switch does not re-sync.
+    override fun onStart() {
+        super.onStart()
+        val graph = (application as App).graph
+        if (System.currentTimeMillis() - graph.settingsState.value.lastSyncAt > 30_000) {
+            graph.scope.launch { graph.sync.syncIfLinked() }
+        }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        if (!isChangingConfigurations) {
+            val graph = (application as App).graph
+            graph.scope.launch { graph.sync.syncIfLinked() }
         }
     }
 

@@ -75,6 +75,21 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
   카드가 뜨고, 마지막 페이지에서 "다음" 탭/키를 누르면 `ReaderRoute(next)`로 교체(`popUpTo<ReaderRoute> inclusive`). 큐는 메모리에만.
 - **밝기·색 필터(P1-3)**: 밝기는 `window.attributes.screenBrightness`(리더 안에서만, 나가면 `BRIGHTNESS_OVERRIDE_NONE`). 색 필터는
   RenderEffect(API 31+) 대신 `graphicsLayer(Offscreen)` + `drawWithContent`의 블렌드(Saturation=흑백, Multiply=세피아/따뜻하게)로 API 28에서도 동작.
+- **기기 간 동기화(v0.1.5)**: 서버(LANraragi)에는 임의 데이터를 둘 곳이 없어 **사용자가 고른 JSON 파일 하나**(SAF, 영구 권한)를
+  두 기기가 공유한다 — Synology Drive/Google Drive/Nextcloud 등 문서 제공자가 파일을 옮긴다. `data/sync/SyncManager.sync()` =
+  읽기 → 병합 → 다시 쓰기, 앱 시작(30초 스로틀)·백그라운드 진입·수동 버튼에서 실행. 병합 규칙(`SyncMerge`, 순수 함수·테스트):
+  설정 묶음과 카테고리 순서는 `…ChangedAt`이 더 큰 쪽이 이김, 읽기 기록은 작품별로 `lastReadAt`이 큰 행, 검색 기록은 합집합(10개).
+  다른 서버(host+port+path)의 기록·순서는 합치지 않는다. 파일에 **서버 주소·API 키·캐시 크기·격자 너비·밝기는 넣지 않음**(비밀/기기별).
+  삭제는 전파되지 않는다(툼스톤 없음, 결정 — 단순성). 같은 형식으로 1회성 백업 내보내기/가져오기(병합)도 제공.
+  평점·즐겨찾기는 이미 서버에 있어 동기화 대상이 아니다(앞의 결정 덕분).
+- **페이지 썸네일 격자(P1-5)**: `POST /api/archives/{id}/files/thumbnails`로 전체 페이지 썸네일 생성을 요청하고 minion 작업이 끝나면
+  `thumbnail?page=N&no_fallback=true`를 쓴다(no_fallback 없이 부르면 생성 전 자리표시 이미지가 그 URL로 캐시돼 버림). 구서버(404)·실패 시
+  페이지 이미지를 Coil로 축소해 대체. 디코딩 실패 URL은 캐시에서 제거.
+- **검색 자동완성·기록(P1-7)**: `GET /api/database/stats`를 검색창에 처음 포커스될 때 한 번 받아 메모리에 둔다. LANraragi 검색은 **쉼표로 항목을
+  나누고 공백은 항목 안에 허용**(Search.pm 확인)하므로 마지막 쉼표 뒤 항목만 `ns:text$`로 바꾼다. 최근 검색 10개는 DataStore.
+- **빠른 메뉴·리더 내 평점**: 서재 카드 길게 누르기 → 별점/즐겨찾기/NEW/처음부터 읽기/상세, 리더 마지막 페이지에 별점 카드.
+  별점 쓰기는 `LrrApi.setRating()` 하나로 통일(최신 메타데이터를 읽고 title/tags/summary를 함께 PUT).
+- **페이지 길게 누르기**: 공유(FileProvider, `cache/share/`만 노출), 기기에 저장(MediaStore, Android 10+, 권한 없음), 썸네일로 지정(🔑 PUT thumbnail).
 - 의도적으로 하지 않은 것: 멀티모듈, DI 프레임워크, `strings.xml` 분리(개인용·한국어 단일; 공개 배포 시 재검토).
 
 ## 4. LANraragi API 메모 (소스 `tools/openapi.yaml`, `Controller/Api/*.pm` 확인)
@@ -95,6 +110,9 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 | 카테고리 편집 | `PUT /api/categories?name&pinned` 🔑 → `{category_id}`, `PUT/DELETE /api/categories/{catId}/{arcid}` 🔑 | 정적 카테고리의 `archives`에 멤버 arcid |
 | 메타데이터 수정 | `PUT /api/archives/{id}/metadata` (title, tags, summary) 🔑 | **덮어쓰기** — 세 값을 항상 함께 보낼 것(form body) |
 | 전체 검색 | `GET /api/search?start=-1` | 0.8.2+: 페이지 없이 전체 결과. `sortby`는 임의 네임스페이스 허용(`rating`, `artist`…) |
+| 페이지 썸네일 | `POST /api/archives/{id}/files/thumbnails` → 200(모두 있음) / 202 `{job}`; `GET …/thumbnail?page=N&no_fallback=true` | page는 1-based. no_fallback 없으면 생성 전 자리표시 이미지 |
+| 썸네일 지정 | `PUT /api/archives/{id}/thumbnail?page=N` 🔑 | 표지 변경 후 앱 캐시의 썸네일 URL을 지울 것 |
+| 태그 통계 | `GET /api/database/stats?minweight&hide_excluded_namespaces` → `[{namespace,text,weight}]` | 자동완성 |
 | 인증 | 헤더 `Authorization: Bearer base64(api_key)` | No-Fun 모드면 모든 API에 필요 |
 
 `arcid`가 `TANK_`로 시작하면 탄코본(묶음). 검색 결과에 섞여 나옴(`groupby_tanks=true`).
@@ -112,6 +130,7 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 v0.1.2: 페이지 치수 캐시 · 웹툰 세로 스트립 타일링(2048px 밴드, 영역 디코딩) · 실제 종횡비 레이아웃 · 웹툰 모드 제안 스낵바.
 v0.1.3: 가로 모드 양면 보기(표지 단독·가로 페이지 단독 옵션) · 웹툰 레이아웃 줌(1~3×, 더블 탭 2×).
 v0.1.4: 마지막 페이지에서 다음 작품 카드/넘김 · 리더 밝기(1~100%) · 색 필터(흑백/세피아/따뜻하게).
+v0.1.5: 동기화 파일·백업 · 카드 빠른 메뉴 · 리더 마지막 페이지 별점 · 페이지 격자 · 검색 자동완성/기록 · 이어 읽기 줄 · 페이지 공유/저장/썸네일 지정 · 넘김 애니메이션.
 
 ## 6. 자체 업데이트 설계
 1. `GET https://api.github.com/repos/{owner}/{repo}/releases/latest` (하루 1회 자동 + 수동).

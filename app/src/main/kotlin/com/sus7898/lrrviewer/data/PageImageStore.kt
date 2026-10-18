@@ -66,6 +66,16 @@ class PageImageStore(
         snapshot?.use { block(it.data.toFile()) }
     }
 
+    /** Runs [block] with the cached file of the page (for copying it out to share/save). */
+    suspend fun <T> copyTo(url: String, block: (File) -> T): T? = withFile(url, block)
+
+    /** Drops [url] from both caches (e.g. after the server regenerated a thumbnail). */
+    @OptIn(ExperimentalCoilApi::class)
+    fun evict(url: String) {
+        runCatching { imageLoader.diskCache?.remove(url) }
+        imageLoader.memoryCache?.let { cache -> cache.keys.filter { it.key == url }.forEach { cache.remove(it) } }
+    }
+
     /** Image dimensions without decoding pixels (`inJustDecodeBounds`). */
     suspend fun bounds(url: String): PageSize? = withFile(url) { file ->
         val opts = BitmapFactory.Options().apply { inJustDecodeBounds = true }

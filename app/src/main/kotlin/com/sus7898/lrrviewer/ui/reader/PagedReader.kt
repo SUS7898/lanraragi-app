@@ -67,6 +67,8 @@ fun PagedReader(
     onNeedSize: (Int) -> Unit,
     onPageChanged: (Int) -> Unit,
     onTap: (TapZone) -> Unit,
+    animatePageTurn: Boolean = true,
+    onLongPress: (Int) -> Unit = {},
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val twoPage = twoPageLandscape && mode != ReadingMode.VERTICAL && maxWidth > maxHeight
@@ -92,7 +94,10 @@ fun PagedReader(
             jumpEvents.collect { p ->
                 if (p in pages.indices) {
                     currentPage = p
-                    pagerState.scrollToPage(spreads.indexOfPage(p))
+                    val target = spreads.indexOfPage(p)
+                    // Neighbouring slot (tap / key) slides like a page turn; longer jumps (slider, TOC) are instant.
+                    if (animatePageTurn && kotlin.math.abs(target - pagerState.currentPage) == 1) pagerState.animateScrollToPage(target)
+                    else pagerState.scrollToPage(target)
                 }
             }
         }
@@ -111,12 +116,15 @@ fun PagedReader(
                     contentScale = contentScale,
                     alignment = Alignment.Center,
                     onTap = { offset, size, bounds -> onTap(zoneOf(offset, size, vertical, bounds)) },
+                    onLongPress = { onLongPress(spread.first) },
                 )
             } else {
+                val ordered = if (mode == ReadingMode.RTL) spread.pages.reversed() else spread.pages
                 SpreadSlot(
-                    urls = (if (mode == ReadingMode.RTL) spread.pages.reversed() else spread.pages).map { pages[it] },
+                    urls = ordered.map { pages[it] },
                     contentScale = contentScale,
                     onTap = onTap,
+                    onLongPress = { slot -> onLongPress(ordered[slot]) },
                 )
             }
         }
@@ -142,7 +150,7 @@ fun PagedReader(
 
 /** Two pages side by side meeting in the middle; tap zones are measured on the whole slot, not per page. */
 @Composable
-private fun SpreadSlot(urls: List<String>, contentScale: ContentScale, onTap: (TapZone) -> Unit) {
+private fun SpreadSlot(urls: List<String>, contentScale: ContentScale, onTap: (TapZone) -> Unit, onLongPress: (Int) -> Unit) {
     var slotSize by remember { mutableStateOf(IntSize.Zero) }
     Row(Modifier.fillMaxSize().onSizeChanged { slotSize = it }) {
         urls.forEachIndexed { slot, url ->
@@ -155,6 +163,7 @@ private fun SpreadSlot(urls: List<String>, contentScale: ContentScale, onTap: (T
                         val dx = slot * size.width.toFloat()
                         onTap(zoneOf(offset + Offset(dx, 0f), slotSize, vertical = false, contentBounds = bounds.translate(dx, 0f)))
                     },
+                    onLongPress = { onLongPress(slot) },
                 )
             }
         }
@@ -168,6 +177,7 @@ private fun ReaderPage(
     contentScale: ContentScale,
     alignment: Alignment,
     onTap: (Offset, IntSize, Rect) -> Unit,
+    onLongPress: () -> Unit = {},
 ) {
     val context = LocalContext.current
     var retry by remember(url) { mutableIntStateOf(0) }
@@ -204,6 +214,7 @@ private fun ReaderPage(
             contentScale = contentScale,
             alignment = alignment,
             onClick = { offset -> onTap(offset, size, zoomableState.transformedContentBounds) },
+            onLongClick = { onLongPress() },
         )
         if (!imageState.isImageDisplayed && error == null) {
             CircularProgressIndicator(Modifier.align(Alignment.Center), color = Color.White)

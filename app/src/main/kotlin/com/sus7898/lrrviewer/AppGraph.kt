@@ -10,6 +10,7 @@ import coil3.request.crossfade
 import com.sus7898.lrrviewer.data.AppSettings
 import com.sus7898.lrrviewer.data.CategoryOrderRepository
 import com.sus7898.lrrviewer.data.FavoritesRepository
+import com.sus7898.lrrviewer.data.PageExport
 import com.sus7898.lrrviewer.data.PageImageStore
 import com.sus7898.lrrviewer.data.PageInfoRepository
 import com.sus7898.lrrviewer.data.ReadingProgressRepository
@@ -18,6 +19,7 @@ import com.sus7898.lrrviewer.data.SettingsRepository
 import com.sus7898.lrrviewer.data.api.LrrApi
 import com.sus7898.lrrviewer.data.api.LrrAuthInterceptor
 import com.sus7898.lrrviewer.data.db.AppDatabase
+import com.sus7898.lrrviewer.data.sync.SyncManager
 import com.sus7898.lrrviewer.ui.reader.ReaderViewModel
 import com.sus7898.lrrviewer.update.UpdateManager
 import kotlinx.coroutines.CoroutineScope
@@ -83,6 +85,10 @@ class AppGraph(private val app: Application) {
     /** Page files in the Coil disk cache: prefetch, dimensions, region (tile) decoding. */
     val pageStore = PageImageStore(app, imageLoader)
     val pageInfo = PageInfoRepository(database.pageInfoDao(), pageStore)
+    val pageExport = PageExport(app, pageStore)
+
+    /** Settings / history / category order / searches through a user-picked sync file (see data/sync). */
+    val sync = SyncManager(app, settings, progress, categoryOrder)
 
     val updater = UpdateManager(app, httpClient, scope)
 

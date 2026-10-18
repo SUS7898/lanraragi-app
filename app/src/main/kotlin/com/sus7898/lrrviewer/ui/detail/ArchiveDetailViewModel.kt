@@ -131,10 +131,7 @@ class ArchiveDetailViewModel(
         }
         viewModelScope.launch {
             _state.update { it.copy(busy = true) }
-            runCatching {
-                val fresh = api.metadata(id) // never overwrite tags edited elsewhere with a stale copy
-                api.updateMetadata(id, fresh.title, Archive.tagsWithRating(fresh.tags, rating), fresh.summary.orEmpty())
-            }.onFailure { e -> _state.update { it.copy(message = "평점 저장 실패: ${e.userMessage()}") } }
+            runCatching { api.setRating(id, rating) }.onFailure { e -> _state.update { it.copy(message = "평점 저장 실패: ${e.userMessage()}") } }
             _state.update { it.copy(busy = false) }
             if (a.rating != rating) load()
         }

@@ -1,5 +1,7 @@
 package com.sus7898.lrrviewer.ui.library
 
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
@@ -14,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import com.sus7898.lrrviewer.data.api.Archive
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ArchiveCard(
     archive: Archive,
@@ -21,8 +24,9 @@ fun ArchiveCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     favorite: Boolean = false,
+    onLongClick: (() -> Unit)? = null,
 ) {
-    Card(onClick = onClick, modifier = modifier) {
+    Card(modifier = modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick, onLongClickLabel = "빠른 메뉴")) {
         Column {
             Box(
                 Modifier

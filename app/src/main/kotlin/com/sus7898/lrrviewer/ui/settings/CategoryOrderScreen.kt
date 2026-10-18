@@ -73,9 +73,8 @@ fun CategoryOrderScreen(graph: AppGraph, onBack: () -> Unit) {
         list.value = newList
         scope.launch {
             graph.categoryOrder.save(newList.map { it.id })
-            if (graph.settingsState.value.categorySort != CategorySort.MANUAL) {
-                graph.settings.edit { it.copy(categorySort = CategorySort.MANUAL) }
-            }
+            // The timestamp lets the sync merge pick the newer order between devices.
+            graph.settings.edit { it.copy(categorySort = CategorySort.MANUAL, categoryOrderChangedAt = System.currentTimeMillis()) }
         }
     }
 

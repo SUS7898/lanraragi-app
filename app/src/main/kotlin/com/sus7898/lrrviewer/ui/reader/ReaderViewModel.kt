@@ -61,6 +61,12 @@ class ReaderViewModel(
         val pageSizes: Map<Int, PageSize> = emptyMap(),
         /** Metadata of the archive that follows in the queue, loaded when the last pages come into view. */
         val nextArchive: Archive? = null,
+        /** Rating of this archive (`rating:N` tag); shown on the last page. */
+        val rating: Int? = null,
+        val thumbs: ThumbState = ThumbState.Idle,
+        /** One-shot message for the snackbar (rating saved, thumbnail set, …). */
+        val message: String? = null,
+        val busy: Boolean = false,
     ) {
         val pageCount: Int get() = pages.size
     }
@@ -108,6 +114,7 @@ class ReaderViewModel(
                         currentPage = start,
                         toc = archive?.tocEntries.orEmpty(),
                         readingModeOverride = saved?.readingModeOverride,
+                        rating = archive?.rating,
                         pageSizes = sizesDeferred.await().filterKeys { k -> k in pages.indices },
                     )
                 }
@@ -226,6 +233,73 @@ class ReaderViewModel(
         }
     }
 
+    // ------------------------------------------------------------------ rating / page actions (🔑 where noted)
+
+    val canEdit: Boolean get() = deps.settings.value.apiKey.isNotBlank()
+
+    /** 🔑 Rates this archive from the reader (stored as the server tag `rating:N`). */
+    fun setRating(rating: Int?) {
+        if (!canEdit) { _state.update { it.copy(message = "설정에서 API 키를 입력해야 평점을 저장할 수 있습니다.") }; return }
+        val before = _state.value.rating
+        _state.update { it.copy(rating = rating, busy = true) }
+        viewModelScope.launch {
+            runCatching { deps.api.setRating(arcId, rating) }
+                .onSuccess { _state.update { it.copy(busy = false, message = rating?.let { r -> "평점 ${r}점을 저장했습니다." } ?: "평점을 지웠습니다.") } }
+                .onFailure { e -> _state.update { it.copy(busy = false, rating = before, message = "평점 저장 실패: ${e.userMessage()}") } }
+        }
+    }
+
+    /** 🔑 Makes page [index] (0-based) the archive cover and drops the stale cached thumbnail. */
+    fun setAsThumbnail(index: Int) {
+        if (!canEdit) { _state.update { it.copy(message = "설정에서 API 키를 입력해야 썸네일을 바꿀 수 있습니다.") }; return }
+        viewModelScope.launch {
+            runCatching { deps.api.setThumbnail(arcId, index + 1) }
+                .onSuccess {
+                    deps.store.evict(deps.api.thumbnailUrl(arcId))
+                    _state.update { it.copy(message = "${index + 1}페이지를 썸네일로 지정했습니다.") }
+                }
+                .onFailure { e -> _state.update { it.copy(message = "썸네일 변경 실패: ${e.userMessage()}") } }
+        }
+    }
+
+    fun showMessage(text: String) = _state.update { it.copy(message = text) }
+    fun consumeMessage() = _state.update { it.copy(message = null) }
+
+    /**
+     * Page grid (P1-5): asks the server to generate every page thumbnail and waits for the job; servers without
+     * page thumbnails (404) or a failed job fall back to the page images themselves (downsampled by Coil).
+     */
+    fun preparePageThumbnails() {
+        val current = _state.value.thumbs
+        if (current is ThumbState.Ready || current is ThumbState.Generating || current is ThumbState.Fallback) return
+        _state.update { it.copy(thumbs = ThumbState.Generating) }
+        viewModelScope.launch {
+            val result = runCatching {
+                val job = deps.api.queuePageThumbnails(arcId)
+                if (job != null) {
+                    var finished = false
+                    repeat(60) {
+                        if (finished) return@repeat
+                        delay(1_000)
+                        val st = runCatching { deps.api.minionJob(job).state }.getOrDefault("")
+                        if (st == "failed") throw IllegalStateException("thumbnail job failed")
+                        if (st == "finished") finished = true
+                    }
+                    if (!finished) throw IllegalStateException("thumbnail job timeout")
+                }
+            }
+            _state.update { it.copy(thumbs = if (result.isSuccess) ThumbState.Ready else ThumbState.Fallback) }
+        }
+    }
+
+    fun pageThumbnailUrl(index: Int): String = when (_state.value.thumbs) {
+        ThumbState.Ready -> deps.api.pageThumbnailUrl(arcId, index + 1)
+        else -> _state.value.pages.getOrElse(index) { "" }
+    }
+
+    /** A thumbnail URL that failed to decode (e.g. a 202 JSON body got cached): forget it so a retry refetches. */
+    fun onThumbnailError(url: String) = deps.store.evict(url)
+
     companion object {
         /** The entry after [current] in [queue], skipping tankoubons; null when absent or [current] is not queued. */
         fun nextArchiveIn(queue: List<String>, current: String): String? {
@@ -234,4 +308,14 @@ class ReaderViewModel(
             return queue.drop(i + 1).firstOrNull { !it.startsWith("TANK_") }
         }
     }
+}
+
+/** Page-grid thumbnail source. */
+sealed interface ThumbState {
+    data object Idle : ThumbState
+    data object Generating : ThumbState
+    /** Server page thumbnails exist: use `thumbnail?page=N`. */
+    data object Ready : ThumbState
+    /** No server page thumbnails: use the page images, downsampled. */
+    data object Fallback : ThumbState
 }

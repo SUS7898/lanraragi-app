@@ -36,6 +36,9 @@ enum class ColorFilterMode(val label: String) {
 /** Value of [AppSettings.readerBrightness] meaning "follow the system brightness". */
 const val BRIGHTNESS_SYSTEM = -1
 
+/** How many recent library searches are kept. */
+const val MAX_RECENT_SEARCHES = 10
+
 /**
  * All user preferences. The API key is kept decrypted only in memory; on disk it is
  * encrypted with an Android Keystore key (see [SecureStore]).
@@ -66,8 +69,23 @@ data class AppSettings(
     /** Screen brightness while reading: [BRIGHTNESS_SYSTEM] or 1..100 percent. */
     val readerBrightness: Int = BRIGHTNESS_SYSTEM,
     val colorFilter: ColorFilterMode = ColorFilterMode.NONE,
+    /** Animate the page flip for taps/keys (jumps from the slider or TOC are always instant). */
+    val animatePageTurn: Boolean = true,
+    /** Show the "이어 읽기" row at the top of an unfiltered library. */
+    val showContinueReading: Boolean = true,
+    /** Most recent first, at most [MAX_RECENT_SEARCHES]. */
+    val recentSearches: List<String> = emptyList(),
     val autoCheckUpdates: Boolean = true,
     val lastUpdateCheck: Long = 0L,
+    // --- sync (see data/sync/SyncManager.kt) ---
+    /** Persisted SAF document URI of the linked sync file, "" = not linked. */
+    val syncFileUri: String = "",
+    val lastSyncAt: Long = 0L,
+    /** Last local change of the synced settings subset; newer side wins on merge. */
+    val settingsChangedAt: Long = 0L,
+    /** Last local change of the manual category order; newer side wins on merge. */
+    val categoryOrderChangedAt: Long = 0L,
 ) {
     val isServerConfigured: Boolean get() = serverUrl.isNotBlank()
+    val isSyncLinked: Boolean get() = syncFileUri.isNotBlank()
 }

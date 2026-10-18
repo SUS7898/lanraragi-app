@@ -150,6 +150,23 @@ data class BookmarkLinkResponse(
     @Serializable(with = LenientBooleanSerializer::class) val success: Boolean = false,
 )
 
+/** `GET /api/database/stats` row. */
+@Serializable
+data class TagStat(
+    @Serializable(with = LenientStringSerializer::class) val namespace: String = "",
+    @Serializable(with = LenientStringSerializer::class) val text: String = "",
+    @Serializable(with = LenientIntSerializer::class) val weight: Int = 0,
+) {
+    val raw: String get() = if (namespace.isBlank()) text else "$namespace:$text"
+}
+
+/** 202 responses that queue a minion job (`{job, operation, success}`); `job` < 0 when nothing was queued. */
+@Serializable
+data class JobResponse(
+    @Serializable(with = LenientIntSerializer::class) val job: Int = -1,
+    @Serializable(with = LenientBooleanSerializer::class) val success: Boolean = false,
+)
+
 /** Response of `PUT /api/categories` (create). */
 @Serializable
 data class CategoryIdResponse(

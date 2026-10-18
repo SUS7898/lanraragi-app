@@ -8,11 +8,21 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
+import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.Image
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Save
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.ScreenLockRotation
 import androidx.compose.material.icons.filled.ScreenRotation
 import androidx.compose.material.icons.filled.SwapHoriz
@@ -45,6 +55,10 @@ import com.sus7898.lrrviewer.data.ReaderBackground
 import com.sus7898.lrrviewer.data.ReadingMode
 import com.sus7898.lrrviewer.data.api.Archive
 import com.sus7898.lrrviewer.ui.common.ErrorView
+import com.sus7898.lrrviewer.ui.common.RatingStars
+import com.sus7898.lrrviewer.data.api.userMessage
+import coil3.request.ImageRequest
+import coil3.request.ErrorResult
 import com.sus7898.lrrviewer.ui.common.findActivity
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -77,6 +91,9 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
     var showToc by remember { mutableStateOf(false) }
     var orientationLocked by rememberSaveable { mutableStateOf(false) }
     var webtoonSuggested by rememberSaveable { mutableStateOf(false) }
+    /** 0-based page whose long-press menu is open. */
+    var pageMenu by remember { mutableStateOf<Int?>(null) }
+    var showGrid by remember { mutableStateOf(false) }
     /** Page index to show (paged modes) or scroll to (webtoon). */
     val jumpEvents = remember { MutableSharedFlow<Int>(extraBufferCapacity = 8) }
     /** Webtoon only: scroll by this fraction of the viewport height (negative = up). */
@@ -144,6 +161,10 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
         if (result == SnackbarResult.ActionPerformed) vm.setReadingModeOverride(ReadingMode.WEBTOON)
     }
 
+    LaunchedEffect(state.message) {
+        state.message?.let { snackbar.showSnackbar(it); vm.consumeMessage() }
+    }
+
     // --- navigation ----------------------------------------------------------------------
     /** Next/previous for taps and keys: a page in paged modes, most of a screen in webtoon mode; past the last page → next archive. */
     fun navigate(forward: Boolean) {
@@ -208,6 +229,7 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                     onNeedSize = vm::ensureSize,
                     onPageChanged = vm::onPageChanged,
                     onTap = ::onZoneTap,
+                    onLongPress = { pageMenu = it },
                 )
                 else -> PagedReader(
                     pages = state.pages,
@@ -221,6 +243,8 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                     onNeedSize = vm::ensureSize,
                     onPageChanged = vm::onPageChanged,
                     onTap = ::onZoneTap,
+                    animatePageTurn = settings.animatePageTurn,
+                    onLongPress = { pageMenu = it },
                 )
             }
         }
@@ -238,10 +262,10 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             )
         }
 
-        // Last page: offer the next archive of the list this one was opened from (P1-4).
+        // Last page: rate the archive and/or continue with the next one of the list it was opened from (P1-4).
         val next = state.nextArchive
         AnimatedVisibility(
-            visible = next != null && state.pageCount > 0 && state.currentPage >= state.pageCount - 1,
+            visible = state.pageCount > 0 && state.currentPage >= state.pageCount - 1,
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .padding(bottom = if (chromeVisible) 132.dp else 40.dp)
@@ -249,7 +273,10 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             enter = fadeIn() + slideInVertically { it / 2 },
             exit = fadeOut() + slideOutVertically { it / 2 },
         ) {
-            if (next != null) NextArchiveCard(next, graph.api.thumbnailUrl(next.arcid)) { onOpenNext(next.arcid) }
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                EndRatingCard(rating = state.rating, enabled = vm.canEdit && !state.busy, onRate = vm::setRating)
+                if (next != null) NextArchiveCard(next, graph.api.thumbnailUrl(next.arcid)) { onOpenNext(next.arcid) }
+            }
         }
 
         AnimatedVisibility(
@@ -306,6 +333,7 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                 onJump = { p -> jumpEvents.tryEmit(p.coerceIn(0, state.pageCount - 1)) },
                 onSettings = { showSettings = true },
                 onToc = { showToc = true },
+                onGrid = { showGrid = true; vm.preparePageThumbnails() },
                 onCycleMode = {
                     // Quick toggle applies to this archive only; the settings sheet changes the global default.
                     val modes = ReadingMode.entries
@@ -330,6 +358,42 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
             onChange = { transform -> scope.launch { graph.settings.edit(transform) } },
             onOverrideChange = vm::setReadingModeOverride,
             onDismiss = { showSettings = false },
+        )
+    }
+    pageMenu?.let { index ->
+        PageMenuSheet(
+            page1 = index + 1,
+            canSave = graph.pageExport.canSave,
+            canEdit = vm.canEdit,
+            onShare = {
+                pageMenu = null
+                scope.launch {
+                    runCatching { graph.pageExport.shareIntent(state.pages[index], state.title, index + 1) }
+                        .onSuccess { context.startActivity(it) }
+                        .onFailure { vm.showMessage("공유 실패: ${it.userMessage()}") }
+                }
+            },
+            onSave = {
+                pageMenu = null
+                scope.launch {
+                    runCatching { graph.pageExport.save(state.pages[index], state.title, index + 1) }
+                        .onSuccess { vm.showMessage(it) }
+                        .onFailure { vm.showMessage("저장 실패: ${it.userMessage()}") }
+                }
+            },
+            onSetThumbnail = { pageMenu = null; vm.setAsThumbnail(index) },
+            onDismiss = { pageMenu = null },
+        )
+    }
+    if (showGrid) {
+        PageGridSheet(
+            pageCount = state.pageCount,
+            currentPage = state.currentPage,
+            thumbs = state.thumbs,
+            urlFor = vm::pageThumbnailUrl,
+            onThumbError = vm::onThumbnailError,
+            onJump = { p -> jumpEvents.tryEmit(p); showGrid = false },
+            onDismiss = { showGrid = false },
         )
     }
     if (showToc) {
@@ -384,6 +448,7 @@ private fun ReaderBottomBar(
     onJump: (Int) -> Unit,
     onSettings: () -> Unit,
     onToc: () -> Unit,
+    onGrid: () -> Unit,
     onCycleMode: () -> Unit,
 ) {
     Surface(color = Color.Black.copy(alpha = 0.65f), contentColor = Color.White, modifier = Modifier.fillMaxWidth()) {
@@ -411,8 +476,121 @@ private fun ReaderBottomBar(
             }
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
                 IconButton(onClick = onCycleMode) { Icon(Icons.Filled.SwapHoriz, contentDescription = "이 작품의 읽기 방향 전환: ${mode.label}") }
+                IconButton(onClick = onGrid) { Icon(Icons.Filled.GridView, contentDescription = "페이지 목록") }
                 IconButton(onClick = onToc, enabled = hasToc) { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "목차") }
                 IconButton(onClick = onSettings) { Icon(Icons.Filled.Tune, contentDescription = "뷰어 설정") }
+            }
+        }
+    }
+}
+
+/** Last-page rating card (stars write the server tag `rating:N`). */
+@Composable
+private fun EndRatingCard(rating: Int?, enabled: Boolean, onRate: (Int?) -> Unit) {
+    Card {
+        Row(Modifier.padding(horizontal = 12.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Text("다 읽었어요 · 평점", style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f))
+            RatingStars(rating = rating, enabled = enabled, onRate = onRate, size = 40.dp)
+        }
+    }
+}
+
+/** Long-press menu of a page: share, save to the gallery, use as the archive cover. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PageMenuSheet(
+    page1: Int,
+    canSave: Boolean,
+    canEdit: Boolean,
+    onShare: () -> Unit,
+    onSave: () -> Unit,
+    onSetThumbnail: () -> Unit,
+    onDismiss: () -> Unit,
+) {
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(Modifier.padding(bottom = 32.dp)) {
+            Text("${page1}페이지", style = MaterialTheme.typography.titleMedium, modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp))
+            ListItem(
+                headlineContent = { Text("공유") },
+                leadingContent = { Icon(Icons.Filled.Share, contentDescription = null) },
+                modifier = Modifier.clickable(onClick = onShare),
+            )
+            ListItem(
+                headlineContent = { Text("기기에 저장") },
+                supportingContent = { Text(if (canSave) "사진 › Pictures/LRR Viewer" else "Android 10 이상에서 지원") },
+                leadingContent = { Icon(Icons.Filled.Save, contentDescription = null) },
+                modifier = Modifier.clickable(enabled = canSave, onClick = onSave),
+            )
+            ListItem(
+                headlineContent = { Text("이 페이지를 썸네일로 지정") },
+                supportingContent = { Text(if (canEdit) "서버의 표지 이미지를 바꿉니다" else "API 키가 필요합니다") },
+                leadingContent = { Icon(Icons.Filled.Image, contentDescription = null) },
+                modifier = Modifier.clickable(enabled = canEdit, onClick = onSetThumbnail),
+            )
+        }
+    }
+}
+
+/** Grid of all pages (server page thumbnails, or the page images when the server has none); tap jumps. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PageGridSheet(
+    pageCount: Int,
+    currentPage: Int,
+    thumbs: ThumbState,
+    urlFor: (Int) -> String,
+    onThumbError: (String) -> Unit,
+    onJump: (Int) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = (currentPage - 3).coerceAtLeast(0))
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
+        Column(Modifier.fillMaxHeight(0.85f)) {
+            Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("페이지 목록", style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f))
+                if (thumbs == ThumbState.Generating) {
+                    CircularProgressIndicator(Modifier.size(16.dp), strokeWidth = 2.dp)
+                    Spacer(Modifier.width(8.dp))
+                    Text("서버에서 썸네일 만드는 중…", style = MaterialTheme.typography.labelSmall)
+                }
+            }
+            if (thumbs == ThumbState.Generating || thumbs == ThumbState.Idle) return@Column
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 96.dp),
+                state = gridState,
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 32.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                itemsIndexed(List(pageCount) { it }, key = { _, i -> i }) { _, i ->
+                    val url = urlFor(i)
+                    val request = remember(url) {
+                        ImageRequest.Builder(context)
+                            .data(url)
+                            .size(320)
+                            .listener(object : ImageRequest.Listener {
+                                override fun onError(request: ImageRequest, result: ErrorResult) = onThumbError(url)
+                            })
+                            .build()
+                    }
+                    Column(
+                        Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .then(if (i == currentPage) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
+                            .clickable { onJump(i) },
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        AsyncImage(
+                            model = request,
+                            contentDescription = "${i + 1}페이지",
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxWidth().aspectRatio(0.7f).background(Color.DarkGray),
+                        )
+                        Text("${i + 1}", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(2.dp))
+                    }
+                }
             }
         }
     }

@@ -46,6 +46,15 @@ class LrrApi(
 
     fun resolvePages(paths: List<String>): List<String> = paths.map { LrrUrls.resolvePageUrl(baseUrl, it) }
 
+    /**
+     * Small server-side thumbnail of page [page1] (1-based). `no_fallback=true` so a missing thumbnail answers 202
+     * instead of a placeholder image that would get cached as if it were the page; call [queuePageThumbnails] first.
+     */
+    fun pageThumbnailUrl(id: String, page1: Int): String =
+        runCatching {
+            api("archives", id, "thumbnail").addQueryParameter("page", page1.toString()).addQueryParameter("no_fallback", "true").build().toString()
+        }.getOrDefault("")
+
     // ------------------------------------------------------------------ transport
 
     private suspend fun fetchText(request: Request): String = withContext(Dispatchers.IO) {
@@ -135,6 +144,29 @@ class LrrApi(
             .add("summary", summary)
             .build()
         send(api("archives", id, "metadata").build(), "PUT", body)
+    }
+
+    /** 🔑 Sets the cover thumbnail to page [page1] (1-based). */
+    suspend fun setThumbnail(id: String, page1: Int) =
+        send(api("archives", id, "thumbnail").addQueryParameter("page", page1.coerceAtLeast(1).toString()).build(), "PUT")
+
+    /**
+     * Queues generation of every page thumbnail. Returns the minion job id, or null when they all exist already.
+     * Throws [LrrException.HttpError] 404 on servers without page thumbnails.
+     */
+    suspend fun queuePageThumbnails(id: String): Int? {
+        val body = send(api("archives", id, "files", "thumbnails").build(), "POST")
+        return runCatching { json.decodeFromString<JobResponse>(body).job }.getOrDefault(-1).takeIf { it >= 0 }
+    }
+
+    /** Tag statistics for search suggestions (`minweight` drops one-off tags on big libraries). */
+    suspend fun tagStats(minWeight: Int = 1): List<TagStat> =
+        getJson(api("database", "stats").addQueryParameter("minweight", minWeight.toString()).addQueryParameter("hide_excluded_namespaces", "true").build())
+
+    /** 🔑 Stores [rating] (1..5, null = clear) as a `rating:N` tag; title/summary are re-sent from a fresh read (overwrite API). */
+    suspend fun setRating(id: String, rating: Int?) {
+        val fresh = metadata(id)
+        updateMetadata(id, fresh.title, Archive.tagsWithRating(fresh.tags, rating), fresh.summary.orEmpty())
     }
 
     /** Page list; also triggers server-side extraction when needed. */

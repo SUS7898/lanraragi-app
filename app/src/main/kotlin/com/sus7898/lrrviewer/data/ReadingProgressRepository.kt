@@ -47,6 +47,22 @@ class ReadingProgressRepository(
 
     suspend fun remove(arcid: String) = dao.delete(serverId, arcid)
 
+    /** Every row of this server (sync export). */
+    suspend fun all(): List<ReadingProgress> = dao.all(serverId).map { it.toModel() }
+
+    /** Writes a row as-is, keeping its timestamp (sync import; the caller decides which side is newer). */
+    suspend fun put(p: ReadingProgress) = dao.upsert(
+        ReadingProgressEntity(
+            serverId = serverId,
+            arcid = p.arcid,
+            title = p.title,
+            page = p.page,
+            pageCount = p.pageCount,
+            lastReadAt = p.lastReadAt,
+            readingModeOverride = p.readingModeOverride?.name,
+        ),
+    )
+
     suspend fun clear() = dao.deleteAll(serverId)
 
     private fun ReadingProgressEntity.toModel() = ReadingProgress(

@@ -12,6 +12,7 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import com.sus7898.lrrviewer.data.api.LrrUrls
+import com.sus7898.lrrviewer.data.sync.SyncedSettings
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.first
@@ -45,8 +46,15 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         val SPREAD_COVER_ALONE = booleanPreferencesKey("spread_cover_alone")
         val READER_BRIGHTNESS = intPreferencesKey("reader_brightness")
         val COLOR_FILTER = stringPreferencesKey("color_filter")
+        val ANIMATE_PAGE_TURN = booleanPreferencesKey("animate_page_turn")
+        val SHOW_CONTINUE = booleanPreferencesKey("show_continue_reading")
+        val RECENT_SEARCHES = stringPreferencesKey("recent_searches")
         val AUTO_UPDATE = booleanPreferencesKey("auto_check_updates")
         val LAST_UPDATE_CHECK = longPreferencesKey("last_update_check")
+        val SYNC_FILE_URI = stringPreferencesKey("sync_file_uri")
+        val LAST_SYNC_AT = longPreferencesKey("last_sync_at")
+        val SETTINGS_CHANGED_AT = longPreferencesKey("settings_changed_at")
+        val CATEGORY_ORDER_CHANGED_AT = longPreferencesKey("category_order_changed_at")
     }
 
     val flow: Flow<AppSettings> = context.settingsStore.data
@@ -55,11 +63,17 @@ class SettingsRepository(private val context: Context, private val secure: Secur
 
     suspend fun current(): AppSettings = flow.first()
 
-    /** Atomically read-modify-write the settings. */
+    /**
+     * Atomically read-modify-write the settings. When the synced subset ([SyncedSettings]) changes,
+     * [AppSettings.settingsChangedAt] is bumped so the sync merge knows which side is newer.
+     */
     suspend fun edit(transform: (AppSettings) -> AppSettings) {
         context.settingsStore.edit { prefs ->
             val before = prefs.toSettings()
-            val after = transform(before)
+            var after = transform(before)
+            if (after.settingsChangedAt == before.settingsChangedAt && SyncedSettings.from(after) != SyncedSettings.from(before)) {
+                after = after.copy(settingsChangedAt = System.currentTimeMillis())
+            }
             val encryptedKey = when {
                 after.apiKey == before.apiKey -> prefs[Keys.API_KEY_ENC] ?: ""
                 after.apiKey.isBlank() -> ""
@@ -67,6 +81,13 @@ class SettingsRepository(private val context: Context, private val secure: Secur
             }
             prefs.write(after.copy(serverUrl = LrrUrls.normalizeBaseUrl(after.serverUrl)), encryptedKey)
         }
+    }
+
+    /** Adds [query] to the front of the recent searches (deduplicated, capped). Not a synced-settings change. */
+    suspend fun recordSearch(query: String) {
+        val q = query.trim()
+        if (q.isEmpty()) return
+        edit { s -> s.copy(recentSearches = (listOf(q) + s.recentSearches.filter { it != q }).take(MAX_RECENT_SEARCHES)) }
     }
 
     private fun Preferences.toSettings(): AppSettings = AppSettings(
@@ -92,8 +113,15 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         spreadCoverAlone = this[Keys.SPREAD_COVER_ALONE] ?: true,
         readerBrightness = this[Keys.READER_BRIGHTNESS] ?: BRIGHTNESS_SYSTEM,
         colorFilter = enumOrDefault(this[Keys.COLOR_FILTER], ColorFilterMode.NONE),
+        animatePageTurn = this[Keys.ANIMATE_PAGE_TURN] ?: true,
+        showContinueReading = this[Keys.SHOW_CONTINUE] ?: true,
+        recentSearches = this[Keys.RECENT_SEARCHES].orEmpty().split('\n').filter { it.isNotBlank() }.take(MAX_RECENT_SEARCHES),
         autoCheckUpdates = this[Keys.AUTO_UPDATE] ?: true,
         lastUpdateCheck = this[Keys.LAST_UPDATE_CHECK] ?: 0L,
+        syncFileUri = this[Keys.SYNC_FILE_URI] ?: "",
+        lastSyncAt = this[Keys.LAST_SYNC_AT] ?: 0L,
+        settingsChangedAt = this[Keys.SETTINGS_CHANGED_AT] ?: 0L,
+        categoryOrderChangedAt = this[Keys.CATEGORY_ORDER_CHANGED_AT] ?: 0L,
     )
 
     private fun MutablePreferences.write(s: AppSettings, encryptedKey: String) {
@@ -119,8 +147,16 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         this[Keys.SPREAD_COVER_ALONE] = s.spreadCoverAlone
         this[Keys.READER_BRIGHTNESS] = if (s.readerBrightness in 1..100) s.readerBrightness else BRIGHTNESS_SYSTEM
         this[Keys.COLOR_FILTER] = s.colorFilter.name
+        this[Keys.ANIMATE_PAGE_TURN] = s.animatePageTurn
+        this[Keys.SHOW_CONTINUE] = s.showContinueReading
+        this[Keys.RECENT_SEARCHES] = s.recentSearches.map { it.replace('\n', ' ').trim() }.filter { it.isNotEmpty() }
+            .distinct().take(MAX_RECENT_SEARCHES).joinToString("\n")
         this[Keys.AUTO_UPDATE] = s.autoCheckUpdates
         this[Keys.LAST_UPDATE_CHECK] = s.lastUpdateCheck
+        this[Keys.SYNC_FILE_URI] = s.syncFileUri
+        this[Keys.LAST_SYNC_AT] = s.lastSyncAt
+        this[Keys.SETTINGS_CHANGED_AT] = s.settingsChangedAt
+        this[Keys.CATEGORY_ORDER_CHANGED_AT] = s.categoryOrderChangedAt
     }
 }
 

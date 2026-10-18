@@ -34,6 +34,9 @@ interface ReadingProgressDao {
     @Query("SELECT * FROM reading_progress WHERE serverId = :serverId ORDER BY lastReadAt DESC LIMIT :limit")
     fun observeRecent(serverId: String, limit: Int): Flow<List<ReadingProgressEntity>>
 
+    @Query("SELECT * FROM reading_progress WHERE serverId = :serverId")
+    suspend fun all(serverId: String): List<ReadingProgressEntity>
+
     @Query("SELECT * FROM reading_progress WHERE serverId = :serverId AND arcid = :arcid")
     suspend fun get(serverId: String, arcid: String): ReadingProgressEntity?
 

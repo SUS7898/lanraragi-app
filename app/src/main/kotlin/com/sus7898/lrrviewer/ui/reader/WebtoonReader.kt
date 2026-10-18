@@ -83,6 +83,7 @@ fun WebtoonReader(
     onNeedSize: (Int) -> Unit,
     onPageChanged: (Int) -> Unit,
     onTap: (TapZone) -> Unit,
+    onLongPress: (Int) -> Unit = {},
 ) {
     val items = remember(pages.size, pageSizes) { buildWebtoonItems(pages.size, pageSizes) }
     val listState = rememberLazyListState(
@@ -150,6 +151,11 @@ fun WebtoonReader(
                     detectTapGestures(
                         onTap = { offset -> onTap(zoneOf(offset, viewportSize, vertical = true)) },
                         onDoubleTap = { if (scale != 1f) applyZoom(1f / scale) else applyZoom(2f) },
+                        onLongPress = { offset ->
+                            // Rows are laid out in viewport y coordinates (zoom only widens the column).
+                            val row = listState.layoutInfo.visibleItemsInfo.firstOrNull { offset.y.toInt() in it.offset until it.offset + it.size }
+                            row?.let { items.getOrNull(it.index) }?.let { onLongPress(it.page) }
+                        },
                     )
                 }
                 .transformable(transformState, canPan = { false })

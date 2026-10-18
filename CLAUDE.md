@@ -17,7 +17,8 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
 - 서명 키(`*.jks`, `keystore.properties`)는 절대 커밋하지 않는다 (`.gitignore` 참조).
 - 커밋 메시지·코드 주석에 모델 식별자를 넣지 않는다.
 - 숫자/불리언 JSON 필드는 반드시 `LenientXxxSerializer`로 파싱한다 (Mihon 확장이 깨진 원인).
-- 평점은 서버 태그 `rating:N`, 즐겨찾기는 서버 북마크 카테고리다. 메타데이터 PUT은 title/tags/summary를 항상 함께 보낸다(덮어쓰기 API).
+- 평점은 서버 태그 `rating:N`, 즐겨찾기는 서버 북마크 카테고리다. 별점 쓰기는 `LrrApi.setRating()`만 쓴다(메타데이터 PUT은 덮어쓰기 API).
+- 동기화 대상 설정을 추가하면 `SyncedSettings`(from/applyTo)에도 넣는다. 기기별·비밀 값(서버 주소, API 키, 밝기, 격자 너비)은 넣지 않는다.
 - 한국어가 바로 뒤에 오는 문자열 템플릿은 `"${n}점"`처럼 중괄호 필수 (`"$n점"`은 식별자 `n점`으로 해석됨).
 - 새 화면은 `ui/AppRoot.kt`에 `@Serializable` 라우트로 추가한다(문자열 라우트 금지). 로컬 저장은 Room 엔티티에 `serverId` 컬럼 필수.
 - Room 엔티티를 바꾸면 version 증가 + Migration/AutoMigration, 로컬 빌드로 `app/schemas/` 갱신 후 커밋.
@@ -49,6 +50,8 @@ app/src/main/kotlin/com/sus7898/lrrviewer/
   data/CategoryOrderRepository.kt    카테고리 수동 순서 (Room category_order), data/CategorySorting.kt 정렬 모드·자연수 정렬
   data/FavoritesRepository.kt        즐겨찾기 = 서버 북마크 카테고리(멤버 집합 공유, 🔑 토글)
   CrashLog.kt                        마지막 미처리 예외를 files/crash/에 저장 (설정 → 정보)
+  data/sync/SyncModel.kt, SyncManager.kt  기기 간 동기화 파일(SAF) — 스냅샷·병합 규칙(SyncMerge, 순수 함수)·백업. 설정 화면 SyncSection
+  data/PageExport.kt                 페이지 공유(FileProvider cache/share/)·저장(MediaStore)
   data/PageImageStore.kt             페이지 파일 = Coil 디스크 캐시: 프리페치(DiskOnlyDecoder)·치수(inJustDecodeBounds)·영역 디코딩(타일 LRU)
   data/PageInfoRepository.kt         페이지 치수 캐시 (Room page_info) — 웹툰 타일링·모드 제안·(향후) 양면 보기의 기반
   data/api/LrrApi.kt           LANraragi API 클라이언트 (OkHttp + kotlinx.serialization)

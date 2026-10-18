@@ -63,7 +63,7 @@ fun HomeScreen(
     ) { padding ->
         Box(Modifier.padding(padding).fillMaxSize()) {
             when (tab) {
-                HomeTab.LIBRARY -> LibraryScreen(graph = graph, onOpenArchive = onOpenArchive)
+                HomeTab.LIBRARY -> LibraryScreen(graph = graph, onOpenArchive = onOpenArchive, onOpenReader = onOpenReader)
                 HomeTab.HISTORY -> HistoryScreen(graph = graph, onOpenArchive = onOpenArchive, onOpenReader = onOpenReader)
                 HomeTab.SETTINGS -> SettingsScreen(graph = graph, onOpenCategoryOrder = onOpenCategoryOrder)
             }

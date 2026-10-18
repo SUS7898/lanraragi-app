@@ -1,7 +1,10 @@
 package com.sus7898.lrrviewer.ui.library
 
 import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items as rowItems
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -15,6 +18,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.Search
@@ -25,13 +29,19 @@ import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import coil3.compose.AsyncImage
 import com.sus7898.lrrviewer.AppGraph
+import com.sus7898.lrrviewer.data.ReadingProgress
+import com.sus7898.lrrviewer.data.api.Archive
 import com.sus7898.lrrviewer.data.api.Category
 import com.sus7898.lrrviewer.data.api.SearchQuery
 import com.sus7898.lrrviewer.data.sortCategories
@@ -43,8 +53,8 @@ import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
-    val vm: LibraryViewModel = viewModel { LibraryViewModel(graph.api, graph.settingsState, graph.favorites) }
+fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit, onOpenReader: (String, Int) -> Unit) {
+    val vm: LibraryViewModel = viewModel { LibraryViewModel(graph.api, graph.settingsState, graph.favorites, graph.settings::recordSearch) }
     val state by vm.state.collectAsStateWithLifecycle()
     val settings by graph.settingsState.collectAsStateWithLifecycle()
     val manualOrder by graph.categoryOrder.order.collectAsStateWithLifecycle(initialValue = emptyList())
@@ -57,6 +67,11 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
     val sortedCategories = remember(state.categories, settings.categorySort, manualOrder) {
         sortCategories(state.categories, settings.categorySort, manualOrder)
     }
+    val history by graph.progress.recent.collectAsStateWithLifecycle(initialValue = emptyList())
+    val continueReading = remember(history) { history.filter { !it.isCompleted }.take(12) }
+    var searchFocused by remember { mutableStateOf(false) }
+    var quickArchiveId by remember { mutableStateOf<String?>(null) }
+    val suggestions = remember(state.tagStats, state.searchText) { SearchSuggest.suggest(state.tagStats, state.searchText) }
 
     // Back = clear search/filters first; only an unfiltered library lets Back leave the app.
     BackHandler(enabled = state.hasActiveFilters) {
@@ -84,6 +99,10 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
             .collect { (last, total) -> if (total > 0 && last >= total - 8) vm.loadMore() }
     }
 
+    LaunchedEffect(state.message) {
+        state.message?.let { snackbar.showSnackbar(it); vm.consumeMessage() }
+    }
+
     LaunchedEffect(state.error) {
         state.error?.let {
             if (state.items.isNotEmpty()) {
@@ -100,7 +119,11 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
                 onValueChange = vm::onSearchTextChange,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+                    .onFocusChanged { f ->
+                        searchFocused = f.isFocused
+                        if (f.isFocused) vm.ensureTagStats()
+                    },
                 placeholder = { Text("검색 (예: artist:foo, \"정확한 문구\", -제외)") },
                 singleLine = true,
                 leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
@@ -112,6 +135,29 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
                 keyboardActions = KeyboardActions(onSearch = { vm.submitSearch(); focusManager.clearFocus() }),
             )
+
+            // Autocomplete while typing; recent searches when the box is focused and empty.
+            if (searchFocused && state.searchText.isNotBlank() && suggestions.isNotEmpty()) {
+                ChipRow {
+                    suggestions.forEach { tag ->
+                        SuggestionChip(
+                            onClick = { vm.onSearchTextChange(SearchSuggest.apply(state.searchText, tag)) },
+                            label = { Text("${tag.raw} · ${tag.weight}", maxLines = 1) },
+                        )
+                    }
+                }
+            } else if (searchFocused && state.searchText.isBlank() && settings.recentSearches.isNotEmpty()) {
+                ChipRow {
+                    settings.recentSearches.forEach { q ->
+                        AssistChip(
+                            onClick = { vm.useSearch(q); focusManager.clearFocus() },
+                            label = { Text(q, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                            leadingIcon = { Icon(Icons.Filled.History, contentDescription = null, Modifier.size(16.dp)) },
+                        )
+                    }
+                    TextButton(onClick = { scope.launch { graph.settings.edit { it.copy(recentSearches = emptyList()) } } }) { Text("기록 지우기") }
+                }
+            }
 
             FilterRow(
                 state = state,
@@ -138,6 +184,18 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
                         verticalArrangement = Arrangement.spacedBy(8.dp),
                         modifier = Modifier.fillMaxSize(),
                     ) {
+                        if (settings.showContinueReading && !state.hasActiveFilters && continueReading.isNotEmpty()) {
+                            item(span = { GridItemSpan(maxLineSpan) }, key = "continue_reading") {
+                                ContinueReadingRow(
+                                    entries = continueReading,
+                                    thumbnailUrl = graph.api::thumbnailUrl,
+                                    onOpen = { e ->
+                                        graph.readerQueue.value = continueReading.map { it.arcid }
+                                        onOpenReader(e.arcid, e.page)
+                                    },
+                                )
+                            }
+                        }
                         items(state.items, key = { it.arcid }) { archive ->
                             ArchiveCard(
                                 archive = archive,
@@ -147,6 +205,7 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
                                     graph.readerQueue.value = state.items.filter { !it.isTankoubon }.map { it.arcid }
                                     onOpenArchive(archive.arcid)
                                 },
+                                onLongClick = { quickArchiveId = archive.arcid },
                             )
                         }
                         if (state.loadingMore) {
@@ -172,6 +231,27 @@ fun LibraryScreen(graph: AppGraph, onOpenArchive: (String) -> Unit) {
                 .align(Alignment.BottomEnd)
                 .padding(16.dp),
         ) { Icon(Icons.Filled.Shuffle, contentDescription = "무작위 열기") }
+
+        val quick: Archive? = quickArchiveId?.let { id -> state.items.firstOrNull { it.arcid == id } }
+        if (quick != null) {
+            ArchiveQuickSheet(
+                archive = quick,
+                favorite = quick.arcid in state.favoriteIds,
+                favoritesSupported = state.favoritesSupported,
+                canEdit = settings.apiKey.isNotBlank(),
+                busy = state.busyId == quick.arcid,
+                onRate = { r -> vm.setRating(quick.arcid, r) },
+                onToggleFavorite = { vm.toggleFavorite(quick.arcid) },
+                onToggleNew = { vm.toggleNew(quick) },
+                onOpenDetail = { quickArchiveId = null; onOpenArchive(quick.arcid) },
+                onReadFromStart = {
+                    quickArchiveId = null
+                    graph.readerQueue.value = state.items.filter { !it.isTankoubon }.map { it.arcid }
+                    onOpenReader(quick.arcid, 0)
+                },
+                onDismiss = { quickArchiveId = null },
+            )
+        }
 
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
@@ -308,5 +388,51 @@ private fun FilterRow(
             },
             dismissButton = { TextButton(onClick = { customSortDialog = false }) { Text("취소") } },
         )
+    }
+}
+
+@Composable
+private fun ChipRow(content: @Composable RowScope.() -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        content = content,
+    )
+}
+
+/** "이어 읽기": unfinished archives from the local history, newest first; tap resumes at the saved page. */
+@Composable
+private fun ContinueReadingRow(entries: List<ReadingProgress>, thumbnailUrl: (String) -> String, onOpen: (ReadingProgress) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(bottom = 4.dp)) {
+        Text("이어 읽기", style = MaterialTheme.typography.titleSmall, modifier = Modifier.padding(start = 4.dp, bottom = 6.dp))
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            rowItems(entries, key = { it.arcid }) { e ->
+                Column(Modifier.width(96.dp).clip(MaterialTheme.shapes.small).clickable { onOpen(e) }) {
+                    Box {
+                        AsyncImage(
+                            model = thumbnailUrl(e.arcid),
+                            contentDescription = e.title,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.width(96.dp).aspectRatio(0.7f).clip(MaterialTheme.shapes.small),
+                        )
+                        if (e.pageCount > 0) {
+                            LinearProgressIndicator(
+                                progress = { ((e.page + 1).toFloat() / e.pageCount).coerceIn(0f, 1f) },
+                                modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(3.dp),
+                            )
+                        }
+                    }
+                    Text(e.title.ifBlank { e.arcid }, style = MaterialTheme.typography.labelSmall, maxLines = 2, minLines = 2, overflow = TextOverflow.Ellipsis)
+                    if (e.pageCount > 0) {
+                        Text("${e.page + 1} / ${e.pageCount}", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+        HorizontalDivider(Modifier.padding(top = 8.dp))
     }
 }
