@@ -1,6 +1,6 @@
 # 진행 상황 (PROGRESS)
 
-마지막 갱신: 2026-10-18 (세션 3, 로컬 PC) — v0.1.6: 앱 잠금·최근 앱 숨기기, 웹툰 자동 스크롤·페이지 간격, 서재 목록 보기. 그 전 v0.1.5: 기기 간 동기화 파일·백업, 별점 접근성(카드 빠른 메뉴·리더 마지막 페이지), 페이지 격자·검색 자동완성/기록·이어 읽기·페이지 공유/저장/썸네일 지정·넘김 애니메이션. 다음은 실기기 §9b~§9f 결과 수집.
+마지막 갱신: 2026-10-22 (세션 3, 로컬 PC) — v0.1.7: 가로 연속·연속 보기, 전체 페이지 화면, Rii i4 등 키보드/리모컨/터치패드, 전체 코드 검토 결함 12건 수정. 그 전 v0.1.6: 앱 잠금·최근 앱 숨기기, 웹툰 자동 스크롤·페이지 간격, 서재 목록 보기. 그 전 v0.1.5: 기기 간 동기화 파일·백업, 별점 접근성(카드 빠른 메뉴·리더 마지막 페이지), 페이지 격자·검색 자동완성/기록·이어 읽기·페이지 공유/저장/썸네일 지정·넘김 애니메이션. 다음은 실기기 §9b~§9f 결과 수집.
 
 ## 상태 요약
 - [x] 요구사항 분석, Mihon 오류 원인 확인, LANraragi API 소스 확인
@@ -39,6 +39,7 @@
 - [ ] v0.1.6 실기기 테스트 (§9g)
 - [x] v0.1.7: 가로 연속 모드·연속 보기 버튼(`continuousToggle`), 전체 페이지 화면(`PageThumbnailSource`/`PageThumbnailGrid` 공유),
       Rii i4 등 키보드/리모컨/터치패드(`dispatchKeyEvent`, `ReaderKeyEvents.map`), 전체 코드 검토 반영
+- [x] v0.1.7 릴리스 게시 (Release run 39692496754)
 - [ ] v0.1.7 실기기 테스트 (§9h)
 - [ ] 실기기 피드백 반영 (제스처 감도, 웹툰 모드 줌, 탭존 비율 등)
 
@@ -80,3 +81,6 @@
 | 2026-10-18 | Release run 39117277074 (태그 v0.1.5) | ✅ lrr-viewer-v0.1.5.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
 | 2026-10-18 | CI run 39130473158 + Security Scan run 39130473171 (커밋 99ea56c, v0.1.6 작업분) | ✅ 전부 성공 |
 | 2026-10-18 | Release run 39130863433 (태그 v0.1.6) | ✅ lrr-viewer-v0.1.6.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
+| 2026-10-22 | 로컬 v0.1.7 (`testDebugUnitTest lintDebug assembleDebug`) | ✅ 70 tests, Lint 0 errors — Synology 자리표시 파일로 한 번 실패(§F-6) 후 재실행 |
+| 2026-10-22 | CI run 39692041501 + Security Scan run 39692041672 (커밋 1f9a66c, v0.1.7) | ✅ 전부 성공 |
+| 2026-10-22 | Release run 39692496754 (태그 v0.1.7) | ✅ lrr-viewer-v0.1.7.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
