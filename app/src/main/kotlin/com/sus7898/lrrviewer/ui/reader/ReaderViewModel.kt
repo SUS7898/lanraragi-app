@@ -7,6 +7,8 @@ import com.sus7898.lrrviewer.data.PageImageStore
 import com.sus7898.lrrviewer.data.PageInfoRepository
 import com.sus7898.lrrviewer.data.PageSize
 import com.sus7898.lrrviewer.data.ReadingMode
+import com.sus7898.lrrviewer.data.continuousToggle
+import com.sus7898.lrrviewer.data.isContinuous
 import com.sus7898.lrrviewer.data.ReadingProgressRepository
 import com.sus7898.lrrviewer.data.api.Archive
 import com.sus7898.lrrviewer.data.api.FilesResponse
@@ -82,7 +84,10 @@ class ReaderViewModel(
     private val sizeRequests = HashSet<Int>()
     private var nextLoaded = false
 
-    init { load() }
+    init {
+        load()
+        viewModelScope.launch { thumbnails.state.collect { t -> _state.update { it.copy(thumbs = t) } } }
+    }
 
     fun load(force: Boolean = false) {
         viewModelScope.launch {
@@ -265,40 +270,26 @@ class ReaderViewModel(
     fun showMessage(text: String) = _state.update { it.copy(message = text) }
     fun consumeMessage() = _state.update { it.copy(message = null) }
 
-    /**
-     * Page grid (P1-5): asks the server to generate every page thumbnail and waits for the job; servers without
-     * page thumbnails (404) or a failed job fall back to the page images themselves (downsampled by Coil).
-     */
-    fun preparePageThumbnails() {
-        val current = _state.value.thumbs
-        if (current is ThumbState.Ready || current is ThumbState.Generating || current is ThumbState.Fallback) return
-        _state.update { it.copy(thumbs = ThumbState.Generating) }
-        viewModelScope.launch {
-            val result = runCatching {
-                val job = deps.api.queuePageThumbnails(arcId)
-                if (job != null) {
-                    var finished = false
-                    repeat(60) {
-                        if (finished) return@repeat
-                        delay(1_000)
-                        val st = runCatching { deps.api.minionJob(job).state }.getOrDefault("")
-                        if (st == "failed") throw IllegalStateException("thumbnail job failed")
-                        if (st == "finished") finished = true
-                    }
-                    if (!finished) throw IllegalStateException("thumbnail job timeout")
-                }
-            }
-            _state.update { it.copy(thumbs = if (result.isSuccess) ThumbState.Ready else ThumbState.Fallback) }
-        }
-    }
+    // ------------------------------------------------------------------ page grid (shared with the overview screen)
 
-    fun pageThumbnailUrl(index: Int): String = when (_state.value.thumbs) {
-        ThumbState.Ready -> deps.api.pageThumbnailUrl(arcId, index + 1)
-        else -> _state.value.pages.getOrElse(index) { "" }
-    }
+    private val thumbnails = PageThumbnailSource(deps.api, deps.store, arcId)
 
-    /** A thumbnail URL that failed to decode (e.g. a 202 JSON body got cached): forget it so a retry refetches. */
-    fun onThumbnailError(url: String) = deps.store.evict(url)
+    fun preparePageThumbnails() = thumbnails.prepare(viewModelScope)
+    fun pageThumbnailUrl(index: Int): String = thumbnails.url(index, _state.value.pages)
+    fun onThumbnailError(url: String) = thumbnails.onError(url)
+
+    // ------------------------------------------------------------------ "연속 보기" toggle
+
+    /** Override in use before switching to a continuous mode, so the toggle can go back to it. */
+    private var overrideBeforeContinuous: ReadingMode? = null
+
+    fun toggleContinuous() {
+        val current = _state.value.readingModeOverride
+        val default = deps.settings.value.readingMode
+        val effective = current ?: default
+        if (!effective.isContinuous) overrideBeforeContinuous = current
+        setReadingModeOverride(continuousToggle(current, default, overrideBeforeContinuous))
+    }
 
     companion object {
         /** The entry after [current] in [queue], skipping tankoubons; null when absent or [current] is not queued. */
@@ -308,14 +299,4 @@ class ReaderViewModel(
             return queue.drop(i + 1).firstOrNull { !it.startsWith("TANK_") }
         }
     }
-}
-
-/** Page-grid thumbnail source. */
-sealed interface ThumbState {
-    data object Idle : ThumbState
-    data object Generating : ThumbState
-    /** Server page thumbnails exist: use `thumbnail?page=N`. */
-    data object Ready : ThumbState
-    /** No server page thumbnails: use the page images, downsampled. */
-    data object Fallback : ThumbState
 }

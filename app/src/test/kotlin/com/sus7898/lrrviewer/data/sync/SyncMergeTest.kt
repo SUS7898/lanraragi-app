@@ -29,6 +29,7 @@ class SyncMergeTest {
             categoryOrder = listOf("b", "a"),
             categoryOrderChangedAt = 60,
             recentSearches = listOf("baz", "bar"),
+            searchesChangedAt = 300,
             progress = listOf(
                 SyncedProgress("x", "X", page = 7, pageCount = 10, lastReadAt = 2_000, readingModeOverride = "LTR"), // newer
                 SyncedProgress("y", "Y", page = 1, pageCount = 10, lastReadAt = 4_000), // older -> ignored
@@ -48,8 +49,8 @@ class SyncMergeTest {
         assertEquals("LTR", rows.getValue("x").readingModeOverride)
         assertEquals(9, rows.getValue("y").page)
         assertEquals(listOf("y", "z", "x"), merged.progress.map { it.arcid }) // newest first
-        assertEquals(listOf("artist:foo", "bar", "baz"), merged.recentSearches)
-        assertEquals(1, result.searchesAdded)
+        assertEquals(listOf("baz", "bar"), merged.recentSearches) // newer list wins (so clearing it syncs too)
+        assertTrue(result.searchesApplied)
     }
 
     @Test
@@ -83,5 +84,36 @@ class SyncMergeTest {
     fun `server id ignores scheme, trailing slash and case`() {
         assertEquals("nas.example.com/lrr", SyncMerge.serverId("HTTPS://NAS.example.com/lrr/"))
         assertEquals("192.168.0.10:3000", SyncMerge.serverId("http://192.168.0.10:3000"))
+    }
+
+    @Test
+    fun `a deletion on the other device removes the row unless it was read again later`() {
+        val remote = SyncSnapshot(
+            server = "nas.example.com",
+            deletedProgress = mapOf("x" to 1_500L, "y" to 4_000L), // x deleted after it was read (1_000), y before (5_000)
+        )
+        val (result, merged) = SyncMerge.plan(local, remote)
+        assertEquals(listOf("y"), merged.progress.map { it.arcid })
+        assertEquals(1, result.progressDeleted)
+        assertEquals(1_500L, merged.deletedProgress["x"])
+    }
+
+    @Test
+    fun `a local deletion keeps the file's old copy of the row from coming back`() {
+        val localWithTombstone = local.copy(progress = local.progress.filter { it.arcid != "x" }, deletedProgress = mapOf("x" to 2_000L))
+        val remote = SyncSnapshot(server = "nas.example.com", progress = listOf(SyncedProgress("x", lastReadAt = 1_000)))
+        val (result, merged) = SyncMerge.plan(localWithTombstone, remote)
+        assertEquals(0, result.progressUpdated)
+        assertFalse(merged.progress.any { it.arcid == "x" })
+        // ...but reading it again on the other device after the deletion brings it back.
+        val readAgain = remote.copy(progress = listOf(SyncedProgress("x", lastReadAt = 3_000)))
+        assertTrue(SyncMerge.plan(localWithTombstone, readAgain).second.progress.any { it.arcid == "x" })
+    }
+
+    @Test
+    fun `clearing recent searches on one device wins over an older non-empty list`() {
+        val cleared = local.copy(recentSearches = emptyList(), searchesChangedAt = 900)
+        val older = SyncSnapshot(server = "nas.example.com", recentSearches = listOf("a", "b"), searchesChangedAt = 100)
+        assertTrue(SyncMerge.plan(cleared, older).second.recentSearches.isEmpty())
     }
 }

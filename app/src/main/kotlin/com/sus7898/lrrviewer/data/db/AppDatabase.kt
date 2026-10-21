@@ -51,7 +51,65 @@ interface ReadingProgressDao {
 
     @Query("DELETE FROM reading_progress WHERE serverId = :serverId")
     suspend fun deleteAll(serverId: String)
+
+    @Query("UPDATE reading_progress SET title = CASE WHEN :title = '' THEN title ELSE :title END, page = :page, pageCount = :pageCount, lastReadAt = :at WHERE serverId = :serverId AND arcid = :arcid")
+    suspend fun updatePosition(serverId: String, arcid: String, title: String, page: Int, pageCount: Int, at: Long): Int
+
+    /**
+     * Position update that never rewrites `readingModeOverride` (an UPDATE when the row exists), so a progress save
+     * racing a reading-mode change cannot drop the override.
+     */
+    @Transaction
+    suspend fun recordProgress(serverId: String, arcid: String, title: String, page: Int, pageCount: Int, at: Long) {
+        if (updatePosition(serverId, arcid, title, page, pageCount, at) == 0) {
+            upsert(ReadingProgressEntity(serverId, arcid, title.ifBlank { arcid }, page, pageCount, at))
+        }
+    }
+
+    /** Sync import: keeps whichever of the stored and incoming row was read last. */
+    @Transaction
+    suspend fun upsertIfNewer(entity: ReadingProgressEntity) {
+        val existing = get(entity.serverId, entity.arcid)
+        if (existing == null || existing.lastReadAt < entity.lastReadAt) upsert(entity)
+    }
+
+    // --- deletion tombstones (sync) ---
+
+    @Upsert
+    suspend fun upsertTombstones(rows: List<HistoryTombstoneEntity>)
+
+    @Query("SELECT * FROM history_tombstone WHERE serverId = :serverId")
+    suspend fun tombstones(serverId: String): List<HistoryTombstoneEntity>
+
+    @Query("DELETE FROM history_tombstone WHERE serverId = :serverId AND deletedAt < :before")
+    suspend fun pruneTombstones(serverId: String, before: Long)
+
+    @Query("DELETE FROM reading_progress WHERE serverId = :serverId AND arcid IN (:arcids)")
+    suspend fun deleteMany(serverId: String, arcids: List<String>)
+
+    @Transaction
+    suspend fun deleteWithTombstone(serverId: String, arcids: List<String>, at: Long) {
+        if (arcids.isEmpty()) return
+        arcids.chunked(500).forEach { deleteMany(serverId, it) }
+        upsertTombstones(arcids.map { HistoryTombstoneEntity(serverId, it, at) })
+    }
+
+    /** A deletion from the other device: drop the row unless it was read again after [deletedAt]; keep the tombstone. */
+    @Transaction
+    suspend fun applyTombstone(serverId: String, arcid: String, deletedAt: Long) {
+        val existing = get(serverId, arcid)
+        if (existing != null && existing.lastReadAt <= deletedAt) delete(serverId, arcid)
+        upsertTombstones(listOf(HistoryTombstoneEntity(serverId, arcid, deletedAt)))
+    }
 }
+
+/** "This history row was deleted at [deletedAt]": lets the sync file remove it on the other device too. */
+@Entity(tableName = "history_tombstone", primaryKeys = ["serverId", "arcid"])
+data class HistoryTombstoneEntity(
+    val serverId: String,
+    val arcid: String,
+    val deletedAt: Long,
+)
 
 /** User-defined display order of server categories (local only; the server has no category ordering). */
 @Entity(tableName = "category_order", primaryKeys = ["serverId", "categoryId"])
@@ -108,10 +166,10 @@ interface PageInfoDao {
 }
 
 @Database(
-    entities = [ReadingProgressEntity::class, CategoryOrderEntity::class, PageInfoEntity::class],
-    version = 3,
+    entities = [ReadingProgressEntity::class, CategoryOrderEntity::class, PageInfoEntity::class, HistoryTombstoneEntity::class],
+    version = 4,
     exportSchema = true,
-    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3)],
+    autoMigrations = [AutoMigration(from = 1, to = 2), AutoMigration(from = 2, to = 3), AutoMigration(from = 3, to = 4)],
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun readingProgressDao(): ReadingProgressDao

@@ -11,6 +11,7 @@ import com.sus7898.lrrviewer.data.api.SearchQuery
 import com.sus7898.lrrviewer.data.api.ServerInfo
 import com.sus7898.lrrviewer.data.api.TagStat
 import com.sus7898.lrrviewer.data.api.userMessage
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -65,6 +66,7 @@ class LibraryViewModel(
     val state = _state.asStateFlow()
 
     private var loadJob: Job? = null
+    private var moreJob: Job? = null
     private var tagStatsRequested = false
 
     /** Server offset of the next page: raw rows fetched so far (decoded + skipped), not `items.size`. */
@@ -150,6 +152,9 @@ class LibraryViewModel(
 
     fun refresh() {
         loadJob?.cancel()
+        // A page request of the previous query must not append to the new results.
+        moreJob?.cancel()
+        _state.update { it.copy(loadingMore = false) }
         loadJob = viewModelScope.launch {
             _state.update { it.copy(loading = it.items.isEmpty(), refreshing = it.items.isNotEmpty(), error = null, endReached = false) }
             try {
@@ -164,9 +169,12 @@ class LibraryViewModel(
                         skipped = page.skipped,
                         loading = false,
                         refreshing = false,
+                        error = null,
                         endReached = page.fetched == 0 || query.hasRatingFilter || nextStart >= page.filtered,
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e // a newer refresh replaced this one: not an error
             } catch (e: Exception) {
                 _state.update { it.copy(loading = false, refreshing = false, error = e.userMessage()) }
             }
@@ -176,21 +184,23 @@ class LibraryViewModel(
     fun loadMore() {
         val s = _state.value
         if (s.loading || s.refreshing || s.loadingMore || s.endReached || s.items.isEmpty()) return
-        viewModelScope.launch {
+        moreJob = viewModelScope.launch {
             _state.update { it.copy(loadingMore = true) }
             try {
                 val page = api.search(s.query, start = nextStart)
+                if (_state.value.query != s.query) return@launch // query changed while loading
                 nextStart += page.fetched
-                val merged = (s.items + page.items).distinctBy { it.arcid }
                 _state.update {
                     it.copy(
-                        items = merged,
+                        items = (it.items + page.items).distinctBy { a -> a.arcid },
                         filtered = page.filtered,
                         skipped = it.skipped + page.skipped,
                         loadingMore = false,
                         endReached = page.fetched == 0 || nextStart >= page.filtered,
                     )
                 }
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _state.update { it.copy(loadingMore = false, error = e.userMessage()) }
             }

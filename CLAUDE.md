@@ -18,7 +18,9 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
 - 커밋 메시지·코드 주석에 모델 식별자를 넣지 않는다.
 - 숫자/불리언 JSON 필드는 반드시 `LenientXxxSerializer`로 파싱한다 (Mihon 확장이 깨진 원인).
 - 평점은 서버 태그 `rating:N`, 즐겨찾기는 서버 북마크 카테고리다. 별점 쓰기는 `LrrApi.setRating()`만 쓴다(메타데이터 PUT은 덮어쓰기 API).
-- 동기화 대상 설정을 추가하면 `SyncedSettings`(from/applyTo)에도 넣는다. 기기별·비밀 값(서버 주소, API 키, 밝기, 격자 너비)은 넣지 않는다.
+- 동기화 대상 설정을 추가하면 `SyncedSettings`(from/applyTo)에도 넣는다. 기기별·비밀 값(서버 주소, API 키, 평문 HTTP 허용, 밝기, 격자 너비, 잠금)은 넣지 않는다.
+- 리더의 창 상태(밝기·화면 켜짐·컷아웃·회전·키 활성)는 세션 효과 한 곳에서 ref-count로 복구한다(`ReaderKeyEvents.enterReader/exitReader`). 설정별 효과에 onDispose 복구를 다시 넣지 말 것.
+- `pointerInput(Unit)` 안에서 쓰는 콜백·목록은 `rememberUpdatedState`로 최신 값을 읽는다. 코루틴의 `catch (e: Exception)`은 `CancellationException`을 먼저 다시 던진다.
 - 한국어가 바로 뒤에 오는 문자열 템플릿은 `"${n}점"`처럼 중괄호 필수 (`"$n점"`은 식별자 `n점`으로 해석됨).
 - 새 화면은 `ui/AppRoot.kt`에 `@Serializable` 라우트로 추가한다(문자열 라우트 금지). 로컬 저장은 Room 엔티티에 `serverId` 컬럼 필수.
 - Room 엔티티를 바꾸면 version 증가 + Migration/AutoMigration, 로컬 빌드로 `app/schemas/` 갱신 후 커밋.
@@ -33,6 +35,7 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
 - 로컬 PC(Android Studio)에서는 `./gradlew :app:testDebugUnitTest :app:assembleDebug`.
   Windows에서는 PowerShell에서 `.\gradlew.bat …`(Git Bash의 `./gradlew`는 한글 경로가 깨짐). 한글 경로·hosts 광고 차단과
   관련된 함정과 사용자 전역 `~/.gradle/gradle.properties` 설정은 `docs/TROUBLESHOOTING.md` §F.
+- 이 PC의 저장소는 Synology Drive 동기화 폴더 안이다. 빌드가 `not a regular file`로 실패하면 `docs/TROUBLESHOOTING.md` §F-6.
 - 릴리스: `git tag vX.Y.Z && git push origin vX.Y.Z` → `Release` 워크플로가 서명 APK +
   `SHA256SUMS.txt`를 GitHub Release에 올림 → 앱이 자동 감지. 저장소 secrets 필요
   (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).
@@ -41,11 +44,12 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
 ```
 app/src/main/kotlin/com/sus7898/lrrviewer/
   App.kt, AppGraph.kt          Application + 수동 DI(서비스 로케이터)
-  MainActivity.kt              Compose 호스트(FragmentActivity), 볼륨키 → ReaderKeyEvents, 잠금 오버레이·FLAG_SECURE, 시작/종료 시 동기화
+  MainActivity.kt              Compose 호스트(FragmentActivity), dispatchKeyEvent → ReaderKeyEvents(키보드·리모컨·볼륨), 잠금 다이얼로그·FLAG_SECURE, 시작/종료 시 동기화
+  ReaderKeyEvents.kt           키 → 리더 동작 매핑(map, 순수 함수) + 리더 세션 ref-count · data/ReadingModes.kt 읽기 방향 판별·연속 보기 전환
   data/AppSettings.kt          설정 데이터 클래스 + enum (ReadingMode 등)
   data/SettingsRepository.kt   DataStore 저장, API 키는 SecureStore로 암호화
   data/SecureStore.kt          Android Keystore AES-GCM
-  data/db/AppDatabase.kt       Room v3: reading_progress / category_order / page_info + DAO. 스키마 JSON은 app/schemas/ (로컬 빌드 후 커밋)
+  data/db/AppDatabase.kt       Room v4: reading_progress / category_order / page_info / history_tombstone + DAO. 스키마 JSON은 app/schemas/ (로컬 빌드 후 커밋)
   data/ReadingProgressRepository.kt  로컬 읽기 기록/진행률/작품별 읽기 방향 (Room 위)
   data/CategoryOrderRepository.kt    카테고리 수동 순서 (Room category_order), data/CategorySorting.kt 정렬 모드·자연수 정렬
   data/FavoritesRepository.kt        즐겨찾기 = 서버 북마크 카테고리(멤버 집합 공유, 🔑 토글)
@@ -64,7 +68,7 @@ app/src/main/kotlin/com/sus7898/lrrviewer/
   update/InstallResultReceiver.kt  설치 세션 결과 수신(사용자 확인 화면 띄움)
   ui/AppRoot.kt                타입 안전 라우트(SetupRoute/HomeRoute/ArchiveRoute/ReaderRoute) + 자동 업데이트 다이얼로그
   ui/home/, ui/library/, ui/history/, ui/detail/, ui/settings/ (CategoryOrderScreen = 드래그 순서 편집, sh.calvin.reorderable)
-  ui/reader/ReaderScreen.kt    호스트(크롬·시스템 UI·키·밝기·다음 작품 카드) / PagedReader.kt(+SpreadLayout.kt 양면 묶음) / WebtoonReader.kt(+WebtoonLayout.kt 행·타일 계산, 레이아웃 줌) / ReaderGestures.kt / ReaderFilter.kt(색 필터 블렌드) / ReaderViewModel.kt(Deps, readerQueue → nextArchive)
+  ui/reader/ReaderScreen.kt    호스트(크롬·시스템 UI·키·밝기·다음 작품 카드) / PagedReader.kt(+SpreadLayout.kt 양면 묶음) / WebtoonReader.kt(+WebtoonLayout.kt 행·타일 계산, 레이아웃 줌) / HorizontalStripReader.kt(가로 연속) / PageThumbnails.kt(썸네일 소스·격자, detail/PageOverviewScreen과 공유) / ReaderGestures.kt / ReaderFilter.kt(색 필터 ColorMatrix 레이어) / ReaderViewModel.kt(Deps, readerQueue → nextArchive)
 app/src/test/…                 JVM 단위 테스트(MockWebServer 포함)
 .github/workflows/ci.yml       테스트·린트·디버그 APK
 .github/workflows/release.yml  태그 → 서명 릴리스 APK + 체크섬 + Trivy 게이트

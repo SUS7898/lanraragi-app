@@ -1,5 +1,6 @@
 package com.sus7898.lrrviewer
 
+import android.annotation.SuppressLint
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.WindowManager
@@ -63,9 +64,20 @@ class MainActivity : FragmentActivity() {
 
     private val keysBlocked: Boolean get() = graph.appLock.locked.value && graph.settingsState.value.appLock
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean =
-        (!keysBlocked && ReaderKeyEvents.onKey(keyCode, isDown = true)) || super.onKeyDown(keyCode, event)
-
-    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean =
-        (!keysBlocked && ReaderKeyEvents.onKey(keyCode, isDown = false)) || super.onKeyUp(keyCode, event)
+    /**
+     * Intercept before the view hierarchy: Compose focus navigation would otherwise eat arrows/Enter from a
+     * keyboard or remote (e.g. a Rii mini keyboard) and onKeyDown would never see them. Dialogs and bottom
+     * sheets are separate windows, so their own keys are unaffected.
+     *
+     * RestrictedApi: lint false positive. androidx.core's ComponentActivity overrides the public
+     * Activity.dispatchKeyEvent and marks its override @RestrictTo; overriding the platform method is supported.
+     */
+    @SuppressLint("RestrictedApi")
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val down = event.action == KeyEvent.ACTION_DOWN
+        if ((down || event.action == KeyEvent.ACTION_UP) && !keysBlocked &&
+            ReaderKeyEvents.onKey(event.keyCode, isDown = down, shift = event.isShiftPressed, repeat = event.repeatCount)
+        ) return true
+        return super.dispatchKeyEvent(event)
+    }
 }

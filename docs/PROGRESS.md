@@ -37,6 +37,9 @@
 - [x] v0.1.6: 앱 잠금(`AppLock`, BiometricPrompt, FragmentActivity) + FLAG_SECURE, 웹툰 자동 스크롤·간격, 서재 목록 보기 — 단위 테스트 61개, Lint 0 errors(로컬)
 - [x] v0.1.6 릴리스 게시 (Release run 39130863433)
 - [ ] v0.1.6 실기기 테스트 (§9g)
+- [x] v0.1.7: 가로 연속 모드·연속 보기 버튼(`continuousToggle`), 전체 페이지 화면(`PageThumbnailSource`/`PageThumbnailGrid` 공유),
+      Rii i4 등 키보드/리모컨/터치패드(`dispatchKeyEvent`, `ReaderKeyEvents.map`), 전체 코드 검토 반영
+- [ ] v0.1.7 실기기 테스트 (§9h)
 - [ ] 실기기 피드백 반영 (제스처 감도, 웹툰 모드 줌, 탭존 비율 등)
 
 ## 다음 세션이 할 일 (우선순위)

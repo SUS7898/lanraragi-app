@@ -75,6 +75,7 @@ fun SettingsScreen(graph: AppGraph, onOpenCategoryOrder: () -> Unit) {
             StepperRow("미리 불러올 페이지 수", settings.prefetchPages, 0..10, subtitle = "다음 페이지를 백그라운드에서 스트리밍해 디스크 캐시에 저장") { v -> update { it.copy(prefetchPages = v) } }
             SwitchRow("서버에 읽기 진행률 저장", settings.syncProgress, "서버의 '서버 측 진행률 추적'이 켜져 있을 때만 동작") { v -> update { it.copy(syncProgress = v) } }
             SwitchRow("읽기 시작 시 NEW 표시 해제", settings.clearNewOnRead) { v -> update { it.copy(clearNewOnRead = v) } }
+            KeyboardHelpItem()
             SwitchRow("페이지 넘김 애니메이션", settings.animatePageTurn, "탭·키로 넘길 때 미끄러지듯 (슬라이더·목차 이동은 즉시)") { v -> update { it.copy(animatePageTurn = v) } }
         }
 
@@ -226,4 +227,39 @@ private fun CacheSection(graph: AppGraph, settings: AppSettings, onCacheSize: (I
             ) { Text(if (clearing) "비우는 중…" else "비우기") }
         },
     )
+}
+
+/** Key map for hardware keyboards / remotes (Rii mini keyboard, Bluetooth keyboard, DeX) and mouse/touchpad. */
+@Composable
+private fun KeyboardHelpItem() {
+    var open by remember { mutableStateOf(false) }
+    ListItem(
+        headlineContent = { Text("키보드·리모컨 단축키") },
+        supportingContent = { Text("Rii 미니 키보드, 블루투스 키보드, DeX, 터치패드") },
+        modifier = Modifier.clickable { open = true },
+    )
+    if (open) {
+        AlertDialog(
+            onDismissRequest = { open = false },
+            title = { Text("키보드·리모컨 단축키") },
+            text = {
+                Text(
+                    listOf(
+                        "→ ↓ PgDn Space Enter · 다음 미디어 키 : 다음",
+                        "← ↑ PgUp Shift+Space Backspace · 이전 미디어 키 : 이전",
+                        "Home / End : 첫 페이지 / 마지막 페이지",
+                        "M · 메뉴 키 · 마우스 오른쪽 클릭 : 메뉴 보이기/숨기기",
+                        "G : 페이지 목록   W : 연속 보기 전환",
+                        "A · 재생/일시정지 키 : 웹툰 자동 스크롤",
+                        "Esc : 리더 나가기",
+                        "휠 · 터치패드 두 손가락 스크롤 : 페이지 넘김 (웹툰은 그대로 스크롤)",
+                        "마우스 클릭 : 화면 탭과 같음 (가장자리 이전/다음, 가운데 메뉴)",
+                        "볼륨 키는 '볼륨 키로 페이지 넘기기'를 켰을 때만",
+                    ).joinToString("\n"),
+                    style = MaterialTheme.typography.bodySmall,
+                )
+            },
+            confirmButton = { TextButton(onClick = { open = false }) { Text("닫기") } },
+        )
+    }
 }

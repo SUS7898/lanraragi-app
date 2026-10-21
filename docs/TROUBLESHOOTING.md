@@ -126,6 +126,10 @@
 - 원인: Kotlin 식별자는 유니코드 문자를 허용하므로 `"$n점"`은 변수 `n점`을 찾는다. 한글(및 다른 비ASCII 문자)이 바로 뒤에 오면 반드시 `"${n}점"`.
 - 재발 방지: 한국어 UI 문자열에서 템플릿 뒤에 글자가 붙으면 항상 중괄호를 쓴다.
 
+### C-12. Lint `RestrictedApi`: `ComponentActivity.dispatchKeyEvent`
+- androidx.core의 `ComponentActivity`가 플랫폼 `Activity.dispatchKeyEvent`를 재정의하며 `@RestrictTo`를 붙여 둬서, 앱이 재정의하면 오류로 잡힌다.
+  플랫폼 공개 API의 재정의라 실제 제약이 아님 → `@SuppressLint("RestrictedApi")` + 이유 주석(MainActivity).
+
 ## E. 구조 개편(세션 1 후반) 시 확인한 사항 — Room · Coil 3 · 타입 안전 내비게이션
 
 ### E-1. 왜 "전면 개편"이 아니라 "선택적 조기 교체"인가 (결정 기록)
@@ -220,6 +224,66 @@
 - `LibraryViewModel`은 init에서 검색·카테고리·북마크 링크·info를 **동시에** 요청하므로 `enqueue` 순서 큐가 어긋난다.
   → `server.dispatcher = object : Dispatcher()`로 경로별 응답을 돌려주고, `Dispatchers.setMain(UnconfinedTestDispatcher())` + `state.first { … }`로 기다린다.
 - `Collator.getInstance(Locale.KOREAN)`은 라틴 문자를 한글보다 앞에 둔다(`Apple` < `Vol 2` < `즐겨찾기`). 정렬 테스트 기대값을 그에 맞춘다.
+
+### F-6. 테스트가 `Cannot snapshot …\binary\output.bin: not a regular file`로 실패 — Synology Drive 자리표시 파일
+- 증상: 테스트 자체는 통과했는데 `:app:testDebugUnitTest`가 출력 스냅샷 단계에서 실패. 해당 파일 속성이 `ReparsePoint`.
+- 원인: `C:\Project\개인용`이 Synology Drive 동기화 폴더라 **빌드 산출물(`app/build`, `.gradle`)까지 올리고, 일부를 온디맨드 자리표시로 바꾼다**
+  (2026-10-22 확인 시 `app/build` 아래 2,862개). Gradle은 자리표시를 일반 파일로 읽지 못한다. 메모리의 "덧붙여 쓴 파일이 되돌려짐"과 같은 원인.
+- 즉시 해결: 문제 폴더(`app/build/test-results/testDebugUnitTest`)를 지우고 다시 빌드.
+- 근본 해결(사용자 PC 설정): Synology Drive 클라이언트 → 동기화 작업 → 설정 → **파일 필터/선택적 동기화**에서 `build`, `.gradle` 폴더를 제외하거나,
+  저장소를 동기화되지 않는 경로(예: `C:\dev\lanraragi-app`)로 옮긴다(그러면 F-1·F-2 한글 경로 우회도 필요 없어짐). 서명 APK는 CI에서만 만들므로 배포물엔 영향 없음.
+
+## H. 전체 코드 검토(2026-10-22, v0.1.7)에서 찾아 고친 결함
+
+### H-1. 양면 보기에서 탭/키 "다음"이 같은 자리에서 멈춤, 마지막 짝의 마지막 페이지에 도달 못 함 (HIGH)
+- 원인: `navigate()`가 `현재 페이지 + 1`로 점프했는데, 양면 슬롯 [1,2]에서 현재 페이지는 1 → 2는 같은 슬롯이라 페이저가 안 움직이고 계속 2를 요청.
+  마지막 슬롯 [n-2,n-1]에선 n-1이 보고되지 않아 끝 카드·다음 작품·완독 처리도 안 됨.
+- 해결: 넘김 모드는 **슬롯 단위 ±1 `stepEvents`**, 범위를 넘으면 `onPastEdge`(다음 작품/메뉴). 마지막 슬롯은 마지막 페이지를 보고.
+
+### H-2. "다음 작품" 전환 후 새 리더의 키·밝기·화면 켜짐이 풀림 (HIGH)
+- 원인: NavHost 크로스페이드 때문에 **새 리더의 효과가 먼저 시작되고 옛 리더의 onDispose가 나중에** 실행되어 `active=false`, 밝기·켜짐 해제를 덮어씀.
+- 해결: `ReaderKeyEvents.enterReader/exitReader` ref-count로 마지막 리더가 나갈 때만 창 복구. 설정별 효과는 값만 쓴다(끄는 값 포함).
+  키 이벤트는 최신 세션 id만 처리(전환 중 Esc 두 번 처리 방지).
+
+### H-3. 상세 화면 "이어 읽기"가 옛 페이지로 진행률을 되돌림 (HIGH)
+- 원인: 상세 VM은 리더가 열린 동안 백스택에 남아 `localPage`가 갱신되지 않음 → 돌아와 다시 누르면 옛 페이지를 **명시 요청**, 700ms 뒤 저장·서버 PUT.
+- 해결: 이어 읽기는 `-1`(리더가 로컬/서버 중 최신을 고름), 상세 화면은 resume 때 진행률을 다시 읽어 라벨 갱신.
+
+### H-4. 웹툰/가로 연속에서 짧은 마지막 페이지가 "현재"가 되지 않음 → 끝 카드·완독 안 됨
+- 해결: `canScrollForward == false`면 마지막 페이지를 보고.
+
+### H-5. 웹툰 길게 누르기가 엉뚱한 페이지(공유·저장·**썸네일 지정**)를 고름
+- 원인: `pointerInput(Unit)` 클로저가 첫 구성의 `items`를 붙잡음 → 타일 분할 후 행↔페이지 대응이 어긋남.
+- 해결: `rememberUpdatedState`로 최신 목록·콜백을 읽음(웹툰·가로 연속 모두). 탭 존 판정도 최신 설정/모드를 VM·설정 StateFlow에서 직접 읽게 함.
+
+### H-6. 서재 새로고침 취소가 가짜 오류 스낵바를 띄움 / 이전 검색의 다음 페이지가 섞임
+- 원인: `catch (e: Exception)`이 `CancellationException`까지 잡음, 성공 시 `error`를 안 지움, `loadMore` 작업을 추적·취소 안 함.
+- 해결: 취소는 다시 던지고, 성공 시 오류 지움, `refresh()`가 `loadMore`를 취소, 결과 도착 시 질의가 바뀌었으면 버림, 최신 목록에 합침.
+
+### H-7. 즐겨찾기 첫 토글이 서버의 기존 북마크 연결을 빈 카테고리로 바꿔버릴 수 있음
+- 원인: 링크 정보를 아직 못 읽었을 때(`categoryId == null`)도 "없음"으로 보고 새 카테고리를 만들어 연결.
+- 해결: 로드 전이면 서버에 먼저 물어보고, 서버가 "없음"을 확인했을 때만 생성(조회 실패는 예외).
+
+### H-8. 동기화가 같은 기기에서 지운 기록·검색어를 되살림
+- 원인: 지운 행은 로컬에 없고 파일엔 있어 "새 행"으로 다시 들어옴, 검색어는 합집합.
+- 해결: Room v4 `history_tombstone`(삭제 시각, 90일 보관) + 파일의 `deletedProgress`. 삭제 이후 다시 읽은 행만 살아남음. 검색 기록은
+  `searchesChangedAt` 기준 최신 목록이 이김(지우기도 전파).
+
+### H-9. 앱 잠금이 열려 있던 시트/다이얼로그 아래로만 깔림(우회 가능), 시작 시 업데이트 다이얼로그가 잠금 위로 뜸
+- 해결: 잠금 화면을 **전체 화면 Dialog 창**으로(나중에 뜬 창이라 시트·다이얼로그 위, 뒤로 가기 삼킴), 잠금 중 자동 업데이트 다이얼로그 억제,
+  인증 요청은 잠금마다 한 번(재개 때마다 다시 띄우면 취소 직후 또 뜨는 문제).
+
+### H-10. 색 필터가 Android 9(API 28)에서 페이지를 회색으로 덮음
+- 원인: Compose `BlendMode.Saturation/Multiply`는 API 29+ 전용, 미만에선 SrcOver로 대체되어 불투명 사각형을 그림.
+- 해결: `saveLayer(paint = ColorMatrix 필터)` 레이어에 콘텐츠를 그림(전 버전 동작). 흑백 = 채도 0, 세피아 = 표준 세피아 행렬, 따뜻하게 = G·B 감쇠.
+
+### H-11. "평문 HTTP 허용"이 동기화되어 LAN(http) 기기의 연결이 끊길 수 있음
+- 해결: 기기별 설정으로(동기화 제외).
+
+### H-12. (LOW) 조용한 자체 업데이트가 항상 확인을 띄움, 진행률 쓰기 경합, 줌 직후 가로 위치
+- `UPDATE_PACKAGES_WITHOUT_USER_ACTION` 권한(일반, API 31+)이 없으면 `USER_ACTION_NOT_REQUIRED`가 무시됨 → 매니페스트에 추가.
+- 진행률 저장을 UPDATE 우선 트랜잭션으로(작품별 읽기 방향을 덮지 않음), 동기화 가져오기는 트랜잭션 안에서 더 최신일 때만 씀.
+- 웹툰 줌 직후 넓어진 레이아웃 전에 가로 스크롤하면 0으로 잘림 → 한 프레임 기다린 뒤 이동.
 
 ## G. 리더 이미지 파이프라인 (v0.1.2, 페이지 치수 캐시·웹툰 타일링)
 

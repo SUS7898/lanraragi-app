@@ -8,17 +8,14 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.foundation.lazy.grid.rememberLazyGridState
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.GridView
+import androidx.compose.material.icons.filled.ViewDay
+import androidx.compose.material.icons.filled.ViewCarousel
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Image
@@ -36,6 +33,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.PointerEventType
+import androidx.compose.ui.input.pointer.isSecondaryPressed
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -55,12 +56,13 @@ import com.sus7898.lrrviewer.ReaderKey
 import com.sus7898.lrrviewer.ReaderKeyEvents
 import com.sus7898.lrrviewer.data.ReaderBackground
 import com.sus7898.lrrviewer.data.ReadingMode
+import com.sus7898.lrrviewer.data.isContinuous
+import com.sus7898.lrrviewer.data.isHorizontalContinuous
+import com.sus7898.lrrviewer.data.isRightToLeft
 import com.sus7898.lrrviewer.data.api.Archive
 import com.sus7898.lrrviewer.ui.common.ErrorView
 import com.sus7898.lrrviewer.ui.common.RatingStars
 import com.sus7898.lrrviewer.data.api.userMessage
-import coil3.request.ImageRequest
-import coil3.request.ErrorResult
 import com.sus7898.lrrviewer.ui.common.findActivity
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.launch
@@ -102,6 +104,8 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
     val jumpEvents = remember { MutableSharedFlow<Int>(extraBufferCapacity = 8) }
     /** Webtoon only: scroll by this fraction of the viewport height (negative = up). */
     val scrollEvents = remember { MutableSharedFlow<Float>(extraBufferCapacity = 8) }
+    /** Paged modes: move one pager slot (±1). With two-page spreads a slot holds two pages, so "page + 1" is not enough. */
+    val stepEvents = remember { MutableSharedFlow<Int>(extraBufferCapacity = 8) }
 
     // --- system UI -----------------------------------------------------------------------
     LaunchedEffect(chromeVisible) {
@@ -110,48 +114,46 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
         controller.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         if (chromeVisible) controller.show(WindowInsetsCompat.Type.systemBars()) else controller.hide(WindowInsetsCompat.Type.systemBars())
     }
+    // One reader session: enter/exit are ref-counted (ReaderKeyEvents) so that when "next archive" cross-fades from one
+    // reader to the next, the old reader's disposal does not undo the window state the new one just set up.
+    var sessionId by remember { mutableIntStateOf(0) }
     DisposableEffect(Unit) {
-        // Draw into the display cutout (punch-hole) area while reading instead of leaving a black band.
+        sessionId = ReaderKeyEvents.enterReader()
         val window = activity?.window
-        val previousCutoutMode = window?.attributes?.layoutInDisplayCutoutMode
+        // Draw into the display cutout (punch-hole) area while reading instead of leaving a black band.
         window?.attributes = window?.attributes?.apply {
             layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
         }
         onDispose {
-            window?.let { w ->
-                WindowCompat.getInsetsController(w, view).show(WindowInsetsCompat.Type.systemBars())
-                w.attributes = w.attributes.apply {
-                    layoutInDisplayCutoutMode = previousCutoutMode ?: WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+            if (ReaderKeyEvents.exitReader()) {
+                window?.let { w ->
+                    WindowCompat.getInsetsController(w, view).show(WindowInsetsCompat.Type.systemBars())
+                    w.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+                    w.attributes = w.attributes.apply {
+                        layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_DEFAULT
+                        screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
+                    }
                 }
+                activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
             }
         }
     }
-    // Reader-only brightness: a window attribute, so the system setting is untouched and restored on exit.
-    DisposableEffect(settings.readerBrightness) {
-        val window = activity?.window
-        if (window != null && settings.readerBrightness in 1..100) {
-            window.attributes = window.attributes.apply { screenBrightness = settings.readerBrightness / 100f }
-        }
-        onDispose {
-            window?.let { w ->
-                w.attributes = w.attributes.apply { screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE }
-            }
+    // Per-setting window state: always written (also the "off" value); the session effect above restores on the last exit.
+    LaunchedEffect(settings.readerBrightness) {
+        val window = activity?.window ?: return@LaunchedEffect
+        window.attributes = window.attributes.apply {
+            screenBrightness = if (settings.readerBrightness in 1..100) settings.readerBrightness / 100f else WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
         }
     }
-    DisposableEffect(settings.keepScreenOn) {
-        val window = activity?.window
-        if (settings.keepScreenOn) window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        onDispose { window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON) }
+    LaunchedEffect(settings.keepScreenOn) {
+        val window = activity?.window ?: return@LaunchedEffect
+        if (settings.keepScreenOn) window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        else window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
     }
-    DisposableEffect(settings.volumeKeyNavigation) {
-        ReaderKeyEvents.active = true
-        ReaderKeyEvents.volumeKeys = settings.volumeKeyNavigation
-        onDispose { ReaderKeyEvents.active = false; ReaderKeyEvents.volumeKeys = false }
-    }
-    DisposableEffect(orientationLocked) {
+    LaunchedEffect(settings.volumeKeyNavigation) { ReaderKeyEvents.volumeKeys = settings.volumeKeyNavigation }
+    LaunchedEffect(orientationLocked) {
         activity?.requestedOrientation =
             if (orientationLocked) ActivityInfo.SCREEN_ORIENTATION_LOCKED else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        onDispose { if (orientationLocked) activity?.requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED }
     }
 
     // --- webtoon suggestion (P1-2): a very tall first page in a paged mode -----------------
@@ -174,30 +176,50 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
     fun navigate(forward: Boolean) {
         val s = vm.state.value
         val mode = s.readingModeOverride ?: graph.settingsState.value.readingMode
-        if (mode == ReadingMode.WEBTOON) {
+        if (mode.isContinuous) {
             scrollEvents.tryEmit(if (forward) WEBTOON_SCROLL_FRACTION else -WEBTOON_SCROLL_FRACTION)
             return
         }
-        val target = if (forward) s.currentPage + 1 else s.currentPage - 1
-        when {
-            target in 0 until s.pageCount -> jumpEvents.tryEmit(target)
-            forward && s.nextArchive != null -> onOpenNext(s.nextArchive.arcid)
-            else -> chromeVisible = true
-        }
+        stepEvents.tryEmit(if (forward) 1 else -1)
+    }
+
+    /** Paged reader reports a step past the last / before the first slot. */
+    fun onPastEdge(forward: Boolean) {
+        val next = vm.state.value.nextArchive
+        if (forward && next != null) onOpenNext(next.arcid) else chromeVisible = true
     }
 
     LaunchedEffect(Unit) {
-        ReaderKeyEvents.events.collect { key -> navigate(forward = key == ReaderKey.NEXT) }
+        ReaderKeyEvents.events.collect { key ->
+            if (sessionId != ReaderKeyEvents.currentSession) return@collect
+            val s = vm.state.value
+            val mode = s.readingModeOverride ?: graph.settingsState.value.readingMode
+            when (key) {
+                ReaderKey.NEXT -> navigate(forward = true)
+                ReaderKey.PREVIOUS -> navigate(forward = false)
+                ReaderKey.FIRST -> if (s.pageCount > 0) jumpEvents.tryEmit(0)
+                ReaderKey.LAST -> if (s.pageCount > 0) jumpEvents.tryEmit(s.pageCount - 1)
+                ReaderKey.TOGGLE_MENU -> chromeVisible = !chromeVisible
+                ReaderKey.PAGE_GRID -> { showGrid = !showGrid; if (showGrid) vm.preparePageThumbnails() }
+                ReaderKey.TOGGLE_CONTINUOUS -> vm.toggleContinuous()
+                ReaderKey.PLAY_PAUSE -> if (mode == ReadingMode.WEBTOON) {
+                    autoScrolling = !autoScrolling
+                    if (autoScrolling) chromeVisible = false
+                }
+                ReaderKey.EXIT -> onBack()
+            }
+        }
     }
 
     fun onZoneTap(zone: TapZone) {
-        if (!settings.tapNavigation || zone == TapZone.CENTER) {
+        val readingMode = vm.state.value.readingModeOverride ?: graph.settingsState.value.readingMode
+        if (!graph.settingsState.value.tapNavigation || zone == TapZone.CENTER) {
             chromeVisible = !chromeVisible
             return
         }
         val forward = when (zone) {
-            TapZone.LEFT -> readingMode == ReadingMode.RTL
-            TapZone.RIGHT -> readingMode != ReadingMode.RTL
+            TapZone.LEFT -> readingMode.isRightToLeft
+            TapZone.RIGHT -> !readingMode.isRightToLeft
             TapZone.TOP -> false
             TapZone.BOTTOM -> true
             TapZone.CENTER -> true
@@ -214,7 +236,35 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
     Box(
         Modifier
             .fillMaxSize()
-            .background(background),
+            .background(background)
+            // Mouse / touchpad (Rii mini keyboard, DeX): right click toggles the menus; the wheel or a two-finger
+            // scroll turns pages in the page-flip modes and pans the horizontal strip. Webtoon lists scroll natively.
+            .pointerInput(Unit) {
+                var lastWheelAt = 0L
+                awaitPointerEventScope {
+                    while (true) {
+                        val event = awaitPointerEvent(PointerEventPass.Initial)
+                        if (event.type == PointerEventType.Press && event.buttons.isSecondaryPressed) {
+                            chromeVisible = !chromeVisible
+                            event.changes.forEach { it.consume() }
+                        } else if (event.type == PointerEventType.Scroll) {
+                            val mode = vm.state.value.readingModeOverride ?: graph.settingsState.value.readingMode
+                            val delta = event.changes.firstOrNull()?.scrollDelta ?: continue
+                            val dy = if (delta.y != 0f) delta.y else delta.x
+                            if (dy == 0f || mode == ReadingMode.WEBTOON) continue
+                            event.changes.forEach { it.consume() }
+                            if (mode.isHorizontalContinuous) {
+                                scrollEvents.tryEmit(if (dy > 0) 0.3f else -0.3f)
+                            } else {
+                                val now = System.currentTimeMillis()
+                                // A touchpad sends a burst of small deltas: one page per gesture.
+                                if (now - lastWheelAt > 280) navigate(forward = dy > 0)
+                                lastWheelAt = now
+                            }
+                        }
+                    }
+                }
+            },
     ) {
         Box(Modifier.fillMaxSize().readerColorFilter(settings.colorFilter)) {
             when {
@@ -223,6 +273,19 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                     ErrorView(state.error!!, modifier = Modifier.weight(1f), onRetry = { vm.load() })
                     TextButton(onClick = onBack, modifier = Modifier.align(Alignment.CenterHorizontally).padding(bottom = 32.dp)) { Text("돌아가기") }
                 }
+                readingMode.isHorizontalContinuous -> HorizontalStripReader(
+                    pages = state.pages,
+                    pageSizes = state.pageSizes,
+                    initialPage = state.currentPage,
+                    rightToLeft = readingMode.isRightToLeft,
+                    gapDp = settings.webtoonGapDp,
+                    jumpEvents = jumpEvents,
+                    scrollEvents = scrollEvents,
+                    onNeedSize = vm::ensureSize,
+                    onPageChanged = vm::onPageChanged,
+                    onTap = ::onZoneTap,
+                    onLongPress = { pageMenu = it },
+                )
                 readingMode == ReadingMode.WEBTOON -> WebtoonReader(
                     pages = state.pages,
                     pageSizes = state.pageSizes,
@@ -252,6 +315,8 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                     onPageChanged = vm::onPageChanged,
                     onTap = ::onZoneTap,
                     animatePageTurn = settings.animatePageTurn,
+                    stepEvents = stepEvents,
+                    onPastEdge = ::onPastEdge,
                     onLongPress = { pageMenu = it },
                 )
             }
@@ -343,6 +408,7 @@ fun ReaderScreen(graph: AppGraph, arcId: String, startPage: Int, onBack: () -> U
                 onToc = { showToc = true },
                 onGrid = { showGrid = true; vm.preparePageThumbnails() },
                 showAutoScroll = readingMode == ReadingMode.WEBTOON,
+                onToggleContinuous = vm::toggleContinuous,
                 autoScrolling = autoScrolling,
                 onToggleAutoScroll = {
                     autoScrolling = !autoScrolling
@@ -465,6 +531,7 @@ private fun ReaderBottomBar(
     onGrid: () -> Unit,
     onCycleMode: () -> Unit,
     showAutoScroll: Boolean = false,
+    onToggleContinuous: () -> Unit = {},
     autoScrolling: Boolean = false,
     onToggleAutoScroll: () -> Unit = {},
 ) {
@@ -477,7 +544,7 @@ private fun ReaderBottomBar(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text("${currentPage + 1}", modifier = Modifier.widthIn(min = 36.dp), textAlign = TextAlign.Center, style = MaterialTheme.typography.labelMedium)
                 Box(Modifier.weight(1f)) {
-                    CompositionLocalProvider(LocalLayoutDirection provides if (mode == ReadingMode.RTL) LayoutDirection.Rtl else LayoutDirection.Ltr) {
+                    CompositionLocalProvider(LocalLayoutDirection provides if (mode.isRightToLeft) LayoutDirection.Rtl else LayoutDirection.Ltr) {
                         var sliderPos by remember(currentPage) { mutableFloatStateOf(currentPage.toFloat()) }
                         Slider(
                             value = sliderPos,
@@ -497,6 +564,12 @@ private fun ReaderBottomBar(
                     IconButton(onClick = onToggleAutoScroll) {
                         Icon(if (autoScrolling) Icons.Filled.Pause else Icons.Filled.PlayArrow, contentDescription = if (autoScrolling) "자동 스크롤 끄기" else "자동 스크롤")
                     }
+                }
+                IconButton(onClick = onToggleContinuous) {
+                    Icon(
+                        if (mode.isContinuous) Icons.Filled.ViewCarousel else Icons.Filled.ViewDay,
+                        contentDescription = if (mode.isContinuous) "한 장씩 넘겨 보기" else "연속으로 보기 (웹툰처럼 끌어서)",
+                    )
                 }
                 IconButton(onClick = onGrid) { Icon(Icons.Filled.GridView, contentDescription = "페이지 목록") }
                 IconButton(onClick = onToc, enabled = hasToc) { Icon(Icons.AutoMirrored.Filled.List, contentDescription = "목차") }
@@ -565,9 +638,7 @@ private fun PageGridSheet(
     onJump: (Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
-    val gridState = rememberLazyGridState(initialFirstVisibleItemIndex = (currentPage - 3).coerceAtLeast(0))
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState) {
         Column(Modifier.fillMaxHeight(0.85f)) {
             Row(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -579,41 +650,13 @@ private fun PageGridSheet(
                 }
             }
             if (thumbs == ThumbState.Generating || thumbs == ThumbState.Idle) return@Column
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 96.dp),
-                state = gridState,
-                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, bottom = 32.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                itemsIndexed(List(pageCount) { it }, key = { _, i -> i }) { _, i ->
-                    val url = urlFor(i)
-                    val request = remember(url) {
-                        ImageRequest.Builder(context)
-                            .data(url)
-                            .size(320)
-                            .listener(object : ImageRequest.Listener {
-                                override fun onError(request: ImageRequest, result: ErrorResult) = onThumbError(url)
-                            })
-                            .build()
-                    }
-                    Column(
-                        Modifier
-                            .clip(MaterialTheme.shapes.small)
-                            .then(if (i == currentPage) Modifier.border(2.dp, MaterialTheme.colorScheme.primary, MaterialTheme.shapes.small) else Modifier)
-                            .clickable { onJump(i) },
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                    ) {
-                        AsyncImage(
-                            model = request,
-                            contentDescription = "${i + 1}페이지",
-                            contentScale = ContentScale.Crop,
-                            modifier = Modifier.fillMaxWidth().aspectRatio(0.7f).background(Color.DarkGray),
-                        )
-                        Text("${i + 1}", style = MaterialTheme.typography.labelSmall, modifier = Modifier.padding(2.dp))
-                    }
-                }
-            }
+            PageThumbnailGrid(
+                pageCount = pageCount,
+                currentPage = currentPage,
+                urlFor = urlFor,
+                onThumbError = onThumbError,
+                onTap = onJump,
+            )
         }
     }
 }

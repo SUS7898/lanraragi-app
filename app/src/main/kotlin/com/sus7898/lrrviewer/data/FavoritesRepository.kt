@@ -56,6 +56,14 @@ class FavoritesRepository(
     /** 🔑 Creates and links a bookmark category when the server has none, then returns its id. */
     private suspend fun ensureCategory(): String {
         _state.value.categoryId?.let { return it }
+        // Not loaded yet (or the last refresh failed): ask the server first. Creating a category here would replace
+        // an existing bookmark link and make every existing favourite disappear. A failure throws instead.
+        if (!_state.value.loaded) {
+            api.bookmarkCategoryId()?.let { linked ->
+                refresh()
+                return linked
+            }
+        }
         val id = api.createCategory(DEFAULT_CATEGORY_NAME, pinned = true)
         api.setBookmarkCategory(id)
         _state.update { it.copy(categoryId = id, supported = true, loaded = true) }

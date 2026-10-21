@@ -18,10 +18,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import com.sus7898.lrrviewer.ui.common.findActivity
-import com.sus7898.lrrviewer.ui.common.rememberResumeTick
 
 /** Weak biometrics (fingerprint/face) or the device PIN/pattern/password. Works on API 28+ with BiometricPrompt 1.1. */
 private const val AUTHENTICATORS = BIOMETRIC_WEAK or DEVICE_CREDENTIAL
@@ -50,12 +51,23 @@ fun authenticate(activity: FragmentActivity, title: String, onSuccess: () -> Uni
     prompt.authenticate(info)
 }
 
-/** Opaque cover shown over the whole app while locked; asks for authentication on every resume. */
+/**
+ * Opaque cover shown while locked. It is a full-screen dialog window, so it also sits above bottom sheets and dialogs
+ * that were open when the app was backgrounded (those are separate windows a plain composable cannot cover), and Back
+ * is swallowed instead of reaching the screens underneath.
+ */
 @Composable
 fun LockScreen(onUnlocked: () -> Unit) {
+    Dialog(
+        onDismissRequest = {},
+        properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false, usePlatformDefaultWidth = false, decorFitsSystemWindows = false),
+    ) { LockContent(onUnlocked) }
+}
+
+@Composable
+private fun LockContent(onUnlocked: () -> Unit) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() as? FragmentActivity }
-    val resumeTick = rememberResumeTick()
     var error by remember { mutableStateOf<String?>(null) }
 
     fun ask() {
@@ -63,7 +75,9 @@ fun LockScreen(onUnlocked: () -> Unit) {
         if (!canUseAppLock(a)) { onUnlocked(); return } // screen lock removed since the setting was turned on
         authenticate(a, "LRR Viewer 잠금 해제", onSuccess = onUnlocked, onError = { error = it })
     }
-    LaunchedEffect(resumeTick) { ask() }
+    // Ask once per lock (the device-credential screen can pause/resume the activity; asking on every resume would
+    // re-open the prompt right after a cancel). The button asks again.
+    LaunchedEffect(Unit) { ask() }
 
     Box(
         Modifier

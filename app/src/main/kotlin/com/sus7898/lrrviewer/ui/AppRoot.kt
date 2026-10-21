@@ -27,6 +27,7 @@ import com.sus7898.lrrviewer.AppGraph
 import com.sus7898.lrrviewer.data.AppSettings
 import com.sus7898.lrrviewer.ui.common.rememberResumeTick
 import com.sus7898.lrrviewer.ui.detail.ArchiveDetailScreen
+import com.sus7898.lrrviewer.ui.detail.PageOverviewScreen
 import com.sus7898.lrrviewer.ui.home.HomeScreen
 import com.sus7898.lrrviewer.ui.reader.ReaderScreen
 import com.sus7898.lrrviewer.ui.settings.CategoryOrderScreen
@@ -41,6 +42,7 @@ import kotlinx.serialization.Serializable
 @Serializable data class ArchiveRoute(val id: String)
 @Serializable data class ReaderRoute(val id: String, val page: Int = -1)
 @Serializable object CategoryOrderRoute
+@Serializable data class PagesRoute(val id: String)
 
 @Composable
 fun AppRoot(graph: AppGraph, settings: AppSettings) {
@@ -70,6 +72,7 @@ fun AppRoot(graph: AppGraph, settings: AppSettings) {
                 onBack = { navController.popBackStack() },
                 onOpenReader = { page -> navController.navigate(ReaderRoute(route.id, page)) },
                 onOpenArchive = { other -> navController.navigate(ArchiveRoute(other)) },
+                onOpenPages = { navController.navigate(PagesRoute(route.id)) },
                 onSearchTag = { tag ->
                     graph.pendingLibrarySearch.value = tag
                     navController.popBackStack<HomeRoute>(inclusive = false)
@@ -84,6 +87,15 @@ fun AppRoot(graph: AppGraph, settings: AppSettings) {
                 startPage = route.page,
                 onBack = { navController.popBackStack() },
                 onOpenNext = { nextId -> navController.navigate(ReaderRoute(nextId)) { popUpTo<ReaderRoute> { inclusive = true } } },
+            )
+        }
+        composable<PagesRoute> { entry ->
+            val route = entry.toRoute<PagesRoute>()
+            PageOverviewScreen(
+                graph = graph,
+                id = route.id,
+                onBack = { navController.popBackStack() },
+                onOpenReader = { page -> navController.navigate(ReaderRoute(route.id, page)) },
             )
         }
         composable<CategoryOrderRoute> {
@@ -117,7 +129,10 @@ private fun AutoUpdateCheck(graph: AppGraph) {
 private fun UpdateDialogs(graph: AppGraph) {
     val updater = graph.updater
     val state by updater.state.collectAsStateWithLifecycle()
-    if (!updater.autoPrompt) return
+    val locked by graph.appLock.locked.collectAsStateWithLifecycle()
+    val appSettings by graph.settingsState.collectAsStateWithLifecycle()
+    // Never pop the update dialog over (or before) the app lock.
+    if (!updater.autoPrompt || (locked && appSettings.appLock)) return
     val context = LocalContext.current
     val resumeTick = rememberResumeTick()
     val canInstall = remember(resumeTick, state) { updater.canRequestInstalls() }

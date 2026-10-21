@@ -5,6 +5,8 @@ enum class ReadingMode(val label: String) {
     RTL("우→좌 넘김 (만화)"),
     VERTICAL("세로 넘김"),
     WEBTOON("웹툰 (연속 스크롤)"),
+    CONTINUOUS_LTR("가로 연속 (좌→우, 끌어서)"),
+    CONTINUOUS_RTL("가로 연속 (우→좌, 끌어서)"),
 }
 
 enum class FitMode(val label: String) {
@@ -95,6 +97,8 @@ data class AppSettings(
     val lastSyncAt: Long = 0L,
     /** Last local change of the synced settings subset; newer side wins on merge. */
     val settingsChangedAt: Long = 0L,
+    /** Last local change of the recent-search list (incl. clearing it); newer side wins on merge. */
+    val searchesChangedAt: Long = 0L,
     /** Last local change of the manual category order; newer side wins on merge. */
     val categoryOrderChangedAt: Long = 0L,
 ) {

@@ -48,6 +48,7 @@ fun ArchiveDetailScreen(
     onOpenReader: (page: Int) -> Unit,
     onOpenArchive: (String) -> Unit,
     onSearchTag: (String) -> Unit,
+    onOpenPages: () -> Unit = {},
 ) {
     val vm: ArchiveDetailViewModel = viewModel(key = "detail_$id") {
         ArchiveDetailViewModel(graph.api, graph.progress, graph.favorites, graph.pageInfo, graph.settingsState, id)
@@ -55,6 +56,10 @@ fun ArchiveDetailScreen(
     val state by vm.state.collectAsStateWithLifecycle()
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
+
+    // Back from the reader: the label "이어 읽기 (Np)" must show the new position.
+    val resumeTick = com.sus7898.lrrviewer.ui.common.rememberResumeTick()
+    LaunchedEffect(resumeTick) { if (resumeTick > 1) vm.refreshProgress() }
 
     LaunchedEffect(state.message) {
         state.message?.let { snackbar.showSnackbar(it); vm.consumeMessage() }
@@ -116,6 +121,7 @@ fun ArchiveDetailScreen(
                 onToggleNew = vm::toggleNew,
                 onReextract = vm::forceReextract,
                 onRate = vm::setRating,
+                onOpenPages = onOpenPages,
                 onSearchTag = onSearchTag,
             )
         }
@@ -134,6 +140,7 @@ private fun ArchiveContent(
     onOpenReader: (Int) -> Unit,
     onToggleNew: () -> Unit,
     onReextract: () -> Unit,
+    onOpenPages: () -> Unit,
     onRate: (Int?) -> Unit,
     onSearchTag: (String) -> Unit,
 ) {
@@ -187,7 +194,9 @@ private fun ArchiveContent(
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { onOpenReader(resumePage ?: 0) }, modifier = Modifier.weight(1f)) {
+                // Resume passes -1: the reader takes the newest of local/server progress itself, so a stale
+                // page shown here can never roll progress back.
+                Button(onClick = { onOpenReader(if (resumePage != null) -1 else 0) }, modifier = Modifier.weight(1f)) {
                     Icon(Icons.Filled.PlayArrow, contentDescription = null)
                     Spacer(Modifier.width(6.dp))
                     Text(
@@ -207,6 +216,7 @@ private fun ArchiveContent(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedButton(onClick = onToggleNew, enabled = !busy) { Text(if (archive.isnew) "NEW 해제" else "NEW 표시") }
+                OutlinedButton(onClick = onOpenPages) { Text("전체 페이지") }
                 OutlinedButton(onClick = onReextract, enabled = !busy) { Text("서버 재추출") }
             }
         }

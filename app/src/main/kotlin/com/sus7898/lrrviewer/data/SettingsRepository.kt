@@ -61,6 +61,7 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         val LAST_SYNC_AT = longPreferencesKey("last_sync_at")
         val SETTINGS_CHANGED_AT = longPreferencesKey("settings_changed_at")
         val CATEGORY_ORDER_CHANGED_AT = longPreferencesKey("category_order_changed_at")
+        val SEARCHES_CHANGED_AT = longPreferencesKey("searches_changed_at")
     }
 
     val flow: Flow<AppSettings> = context.settingsStore.data
@@ -77,8 +78,12 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         context.settingsStore.edit { prefs ->
             val before = prefs.toSettings()
             var after = transform(before)
+            val now = System.currentTimeMillis()
             if (after.settingsChangedAt == before.settingsChangedAt && SyncedSettings.from(after) != SyncedSettings.from(before)) {
-                after = after.copy(settingsChangedAt = System.currentTimeMillis())
+                after = after.copy(settingsChangedAt = now)
+            }
+            if (after.searchesChangedAt == before.searchesChangedAt && after.recentSearches != before.recentSearches) {
+                after = after.copy(searchesChangedAt = now)
             }
             val encryptedKey = when {
                 after.apiKey == before.apiKey -> prefs[Keys.API_KEY_ENC] ?: ""
@@ -134,6 +139,7 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         lastSyncAt = this[Keys.LAST_SYNC_AT] ?: 0L,
         settingsChangedAt = this[Keys.SETTINGS_CHANGED_AT] ?: 0L,
         categoryOrderChangedAt = this[Keys.CATEGORY_ORDER_CHANGED_AT] ?: 0L,
+        searchesChangedAt = this[Keys.SEARCHES_CHANGED_AT] ?: 0L,
     )
 
     private fun MutablePreferences.write(s: AppSettings, encryptedKey: String) {
@@ -175,6 +181,7 @@ class SettingsRepository(private val context: Context, private val secure: Secur
         this[Keys.LAST_SYNC_AT] = s.lastSyncAt
         this[Keys.SETTINGS_CHANGED_AT] = s.settingsChangedAt
         this[Keys.CATEGORY_ORDER_CHANGED_AT] = s.categoryOrderChangedAt
+        this[Keys.SEARCHES_CHANGED_AT] = s.searchesChangedAt
     }
 }
 

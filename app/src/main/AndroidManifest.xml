@@ -5,6 +5,9 @@
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <!-- Needed so the app can install its own updates downloaded from GitHub Releases. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- API 31+: lets PackageInstaller update this app without a confirmation once it is the installer of record
+         (SessionParams.USER_ACTION_NOT_REQUIRED is ignored without it). Normal permission, no prompt. -->
+    <uses-permission android:name="android.permission.UPDATE_PACKAGES_WITHOUT_USER_ACTION" />
 
     <application
         android:name=".App"

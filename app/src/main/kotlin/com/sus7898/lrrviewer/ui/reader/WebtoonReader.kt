@@ -42,6 +42,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
@@ -96,12 +97,18 @@ fun WebtoonReader(
     onAutoScrollEnd: () -> Unit = {},
 ) {
     val items = remember(pages.size, pageSizes) { buildWebtoonItems(pages.size, pageSizes) }
+    // Gesture handlers live in pointerInput(Unit) blocks: read the latest rows/callbacks, never the first composition's.
+    val currentItems by rememberUpdatedState(items)
+    val currentOnTap by rememberUpdatedState(onTap)
+    val currentOnLongPress by rememberUpdatedState(onLongPress)
+    val currentOnAutoScrollEnd by rememberUpdatedState(onAutoScrollEnd)
     val listState = rememberLazyListState(
         initialFirstVisibleItemIndex = items.firstIndexOfPage(initialPage.coerceIn(0, (pages.size - 1).coerceAtLeast(0))) ?: 0,
     )
 
     LaunchedEffect(listState, items) {
-        snapshotFlow { listState.firstVisibleItemIndex }
+        // At the very bottom a short last page is never the first visible row: report the last page then.
+        snapshotFlow { if (!listState.canScrollForward && items.isNotEmpty()) items.lastIndex else listState.firstVisibleItemIndex }
             .collect { index -> items.getOrNull(index)?.let { onPageChanged(it.page) } }
     }
     LaunchedEffect(jumpEvents, items) {
@@ -146,7 +153,7 @@ fun WebtoonReader(
                             last = now
                         }
                     }
-                    if (!listState.canScrollForward) { onAutoScrollEnd(); break }
+                    if (!listState.canScrollForward) { currentOnAutoScrollEnd(); break }
                 } catch (e: CancellationException) {
                     if (!isActive) throw e
                     delay(700)
@@ -170,8 +177,11 @@ fun WebtoonReader(
             val centerX = viewportWidthPx / 2f
             scale = new
             scope.launch {
+                val targetX = ((hScroll.value + centerX) * ratio - centerX).roundToInt().coerceAtLeast(0)
                 listState.scrollToItem(index, (offset * ratio + centerY * (ratio - 1f)).roundToInt().coerceAtLeast(0))
-                hScroll.scrollTo(((hScroll.value + centerX) * ratio - centerX).roundToInt().coerceAtLeast(0))
+                // The wider column is laid out on the next frame; scrolling before that would clamp to the old max.
+                withFrameNanos { }
+                hScroll.scrollTo(targetX.coerceAtMost(hScroll.maxValue))
             }
         }
         val transformState = rememberTransformableState { zoomChange, _, _ -> applyZoom(zoomChange) }
@@ -182,12 +192,12 @@ fun WebtoonReader(
                 .onSizeChanged { viewportSize = it }
                 .pointerInput(Unit) {
                     detectTapGestures(
-                        onTap = { offset -> onTap(zoneOf(offset, viewportSize, vertical = true)) },
+                        onTap = { offset -> currentOnTap(zoneOf(offset, viewportSize, vertical = true)) },
                         onDoubleTap = { if (scale != 1f) applyZoom(1f / scale) else applyZoom(2f) },
                         onLongPress = { offset ->
                             // Rows are laid out in viewport y coordinates (zoom only widens the column).
                             val row = listState.layoutInfo.visibleItemsInfo.firstOrNull { offset.y.toInt() in it.offset until it.offset + it.size }
-                            row?.let { items.getOrNull(it.index) }?.let { onLongPress(it.page) }
+                            row?.let { currentItems.getOrNull(it.index) }?.let { currentOnLongPress(it.page) }
                         },
                     )
                 }

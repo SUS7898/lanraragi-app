@@ -73,6 +73,16 @@ class ArchiveDetailViewModel(
         }
     }
 
+    /** Re-reads the local position (cheap) after returning from the reader. */
+    fun refreshProgress() {
+        if (id.startsWith("TANK_")) return
+        viewModelScope.launch {
+            val local = runCatching { progress.get(id) }.getOrNull()
+            val server = runCatching { api.metadata(id) }.getOrNull()
+            _state.update { it.copy(localPage = local?.page, archive = server ?: it.archive) }
+        }
+    }
+
     /** 0-based page to resume from, or null when there is nothing to resume (unread or finished). */
     fun resumePage(): Int? {
         val s = _state.value

@@ -60,9 +60,11 @@ class SyncManager(
             categoryOrder = categoryOrder.current(),
             categoryOrderChangedAt = s.categoryOrderChangedAt,
             recentSearches = s.recentSearches,
+            searchesChangedAt = s.searchesChangedAt,
             progress = progress.all().map {
                 SyncedProgress(it.arcid, it.title, it.page, it.pageCount, it.lastReadAt, it.readingModeOverride?.name)
             },
+            deletedProgress = progress.tombstones(),
         )
     }
 
@@ -79,20 +81,30 @@ class SyncManager(
     suspend fun merge(remote: SyncSnapshot): MergeResult {
         val local = snapshot()
         val (result, merged) = SyncMerge.plan(local, remote)
-        if (result.settingsApplied || merged.recentSearches != local.recentSearches || merged.settingsChangedAt != local.settingsChangedAt) {
+        if (result.settingsApplied || result.searchesApplied || merged.settingsChangedAt != local.settingsChangedAt ||
+            merged.searchesChangedAt != local.searchesChangedAt
+        ) {
             settings.edit { s ->
                 val base = if (result.settingsApplied) merged.settings.applyTo(s) else s
-                base.copy(recentSearches = merged.recentSearches, settingsChangedAt = merged.settingsChangedAt)
+                base.copy(
+                    recentSearches = merged.recentSearches,
+                    settingsChangedAt = merged.settingsChangedAt,
+                    searchesChangedAt = merged.searchesChangedAt,
+                )
             }
         }
         if (result.categoryOrderApplied) {
             categoryOrder.save(merged.categoryOrder)
             settings.edit { it.copy(categoryOrderChangedAt = merged.categoryOrderChangedAt) }
         }
+        // Deletions first (each one is a no-op if the row was read again after it), then newer rows from the file.
+        merged.deletedProgress.forEach { (arcid, at) ->
+            if (local.deletedProgress[arcid] != at) progress.applyTombstone(arcid, at)
+        }
         if (result.progressUpdated > 0) {
             val localIds = local.progress.associateBy { it.arcid }
             merged.progress.filter { m -> localIds[m.arcid]?.lastReadAt != m.lastReadAt }.forEach { r ->
-                progress.put(
+                progress.putIfNewer(
                     ReadingProgress(
                         arcid = r.arcid,
                         title = r.title,

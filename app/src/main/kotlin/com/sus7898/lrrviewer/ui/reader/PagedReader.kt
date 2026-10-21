@@ -44,6 +44,7 @@ import coil3.request.SuccessResult
 import com.sus7898.lrrviewer.data.FitMode
 import com.sus7898.lrrviewer.data.PageSize
 import com.sus7898.lrrviewer.data.ReadingMode
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import me.saket.telephoto.zoomable.ZoomSpec
 import me.saket.telephoto.zoomable.coil3.ZoomableAsyncImage
@@ -69,6 +70,8 @@ fun PagedReader(
     onTap: (TapZone) -> Unit,
     animatePageTurn: Boolean = true,
     onLongPress: (Int) -> Unit = {},
+    stepEvents: SharedFlow<Int> = MutableSharedFlow(),
+    onPastEdge: (forward: Boolean) -> Unit = {},
 ) {
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val twoPage = twoPageLandscape && mode != ReadingMode.VERTICAL && maxWidth > maxHeight
@@ -82,11 +85,26 @@ fun PagedReader(
             if (pagerState.currentPage != target) pagerState.scrollToPage(target)
             snapshotFlow { pagerState.currentPage }.collect { index ->
                 val spread = spreads.getOrNull(index) ?: return@collect
-                if (currentPage !in spread.pages) currentPage = spread.first
+                // The final slot reports its last page so the archive counts as finished (end card, history).
+                currentPage = when {
+                    index == spreads.lastIndex -> spread.pages.last()
+                    currentPage !in spread.pages -> spread.first
+                    else -> currentPage
+                }
                 onPageChanged(currentPage)
                 if (twoPage) {
                     // Know the shape of the pages ahead so a scanned double page is shown alone before it is reached.
                     for (p in spread.first - 2..spread.pages.last() + 4) if (p in pages.indices) onNeedSize(p)
+                }
+            }
+        }
+        LaunchedEffect(stepEvents, spreads) {
+            stepEvents.collect { step ->
+                val target = pagerState.currentPage + step
+                when {
+                    target in spreads.indices ->
+                        if (animatePageTurn) pagerState.animateScrollToPage(target) else pagerState.scrollToPage(target)
+                    else -> onPastEdge(step > 0)
                 }
             }
         }

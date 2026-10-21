@@ -12,7 +12,7 @@ import kotlinx.serialization.Serializable
 
 /**
  * The settings that travel between devices. Deliberately excluded: server URL and API key (secret; a phone
- * may use the LAN address and a tablet the HTTPS one), cache size, grid width, list/grid view and brightness
+ * may use the LAN address and a tablet the HTTPS one — which is also why "allow plain HTTP" stays per device), cache size, grid width, list/grid view and brightness
  * (per device), app lock / hide-in-recents (security, per device), update/sync bookkeeping.
  */
 @Serializable
@@ -35,7 +35,6 @@ data class SyncedSettings(
     val colorFilter: String = ColorFilterMode.NONE.name,
     val animatePageTurn: Boolean = true,
     val showContinueReading: Boolean = true,
-    val allowCleartext: Boolean = true,
     val autoCheckUpdates: Boolean = true,
     val webtoonGapDp: Int = 0,
     val autoScrollSpeed: Int = 3,
@@ -59,7 +58,6 @@ data class SyncedSettings(
         colorFilter = enumOr(colorFilter, s.colorFilter),
         animatePageTurn = animatePageTurn,
         showContinueReading = showContinueReading,
-        allowCleartext = allowCleartext,
         autoCheckUpdates = autoCheckUpdates,
         webtoonGapDp = webtoonGapDp.coerceIn(0, 32),
         autoScrollSpeed = autoScrollSpeed.coerceIn(1, 10),
@@ -85,7 +83,6 @@ data class SyncedSettings(
             colorFilter = s.colorFilter.name,
             animatePageTurn = s.animatePageTurn,
             showContinueReading = s.showContinueReading,
-            allowCleartext = s.allowCleartext,
             autoCheckUpdates = s.autoCheckUpdates,
             webtoonGapDp = s.webtoonGapDp,
             autoScrollSpeed = s.autoScrollSpeed,
@@ -124,7 +121,10 @@ data class SyncSnapshot(
     val categoryOrder: List<String> = emptyList(),
     val categoryOrderChangedAt: Long = 0L,
     val recentSearches: List<String> = emptyList(),
+    val searchesChangedAt: Long = 0L,
     val progress: List<SyncedProgress> = emptyList(),
+    /** arcid → time the history row was deleted (tombstones, kept 90 days), so deletions reach the other device. */
+    val deletedProgress: Map<String, Long> = emptyMap(),
 ) {
     companion object {
         const val APP_ID = "lrrviewer"
@@ -137,22 +137,27 @@ data class MergeResult(
     val settingsApplied: Boolean = false,
     val categoryOrderApplied: Boolean = false,
     val progressUpdated: Int = 0,
-    val searchesAdded: Int = 0,
+    val progressDeleted: Int = 0,
+    val searchesApplied: Boolean = false,
     val skippedOtherServer: Boolean = false,
 ) {
-    val changedAnything: Boolean get() = settingsApplied || categoryOrderApplied || progressUpdated > 0 || searchesAdded > 0
+    val changedAnything: Boolean get() = settingsApplied || categoryOrderApplied || progressUpdated > 0 || progressDeleted > 0 || searchesApplied
 
     fun describe(): String = buildList {
         if (settingsApplied) add("설정")
         if (categoryOrderApplied) add("카테고리 순서")
         if (progressUpdated > 0) add("읽기 기록 ${progressUpdated}건")
-        if (searchesAdded > 0) add("검색 기록 ${searchesAdded}건")
+        if (progressDeleted > 0) add("지운 기록 ${progressDeleted}건")
+        if (searchesApplied) add("검색 기록")
     }.joinToString(", ").ifEmpty { "변경 없음" } + if (skippedOtherServer) " (다른 서버의 기록은 건너뜀)" else ""
 }
 
 /** Pure merge rules, kept free of Android types so they are unit-tested. */
 object SyncMerge {
-    /** Newer side wins for settings and category order; each history row keeps the newer lastReadAt. */
+    /**
+     * Newer side wins for settings, category order and the recent-search list; each history row keeps the newer
+     * lastReadAt; a deletion (tombstone) removes a row unless that row was read again after the deletion.
+     */
     fun plan(
         local: SyncSnapshot,
         remote: SyncSnapshot,
@@ -160,31 +165,38 @@ object SyncMerge {
         val sameServer = remote.server.isBlank() || local.server.isBlank() || remote.server == local.server
         val settingsWin = remote.settingsChangedAt > local.settingsChangedAt
         val orderWin = remote.categoryOrderChangedAt > local.categoryOrderChangedAt && sameServer
+        val searchesWin = remote.searchesChangedAt > local.searchesChangedAt
+
+        val tombstones = HashMap(local.deletedProgress)
+        if (sameServer) remote.deletedProgress.forEach { (id, at) -> tombstones[id] = maxOf(at, tombstones[id] ?: 0L) }
 
         val localRows = local.progress.associateBy { it.arcid }
         val newerRemoteRows = if (!sameServer) emptyList() else remote.progress.filter { r ->
             val l = localRows[r.arcid]
-            l == null || r.lastReadAt > l.lastReadAt
+            (l == null || r.lastReadAt > l.lastReadAt) && r.lastReadAt > (tombstones[r.arcid] ?: Long.MIN_VALUE)
         }
-        val mergedRows = (localRows + newerRemoteRows.associateBy { it.arcid }).values.sortedByDescending { it.lastReadAt }
-
-        val searches = (local.recentSearches + remote.recentSearches).map { it.trim() }.filter { it.isNotEmpty() }.distinct().take(MAX_RECENT_SEARCHES)
-        val added = searches.count { it !in local.recentSearches }
+        val deletedLocally = local.progress.count { l -> (tombstones[l.arcid] ?: Long.MIN_VALUE) >= l.lastReadAt }
+        val mergedRows = (localRows + newerRemoteRows.associateBy { it.arcid }).values
+            .filter { row -> row.lastReadAt > (tombstones[row.arcid] ?: Long.MIN_VALUE) }
+            .sortedByDescending { it.lastReadAt }
 
         val merged = local.copy(
             settings = if (settingsWin) remote.settings else local.settings,
             settingsChangedAt = maxOf(local.settingsChangedAt, remote.settingsChangedAt),
             categoryOrder = if (orderWin) remote.categoryOrder else local.categoryOrder,
             categoryOrderChangedAt = if (orderWin) remote.categoryOrderChangedAt else local.categoryOrderChangedAt,
-            recentSearches = searches,
+            recentSearches = if (searchesWin) remote.recentSearches.take(MAX_RECENT_SEARCHES) else local.recentSearches,
+            searchesChangedAt = maxOf(local.searchesChangedAt, remote.searchesChangedAt),
             progress = mergedRows,
+            deletedProgress = tombstones,
         )
         val result = MergeResult(
             settingsApplied = settingsWin && remote.settings != local.settings,
             categoryOrderApplied = orderWin && remote.categoryOrder != local.categoryOrder,
             progressUpdated = newerRemoteRows.size,
-            searchesAdded = added,
-            skippedOtherServer = !sameServer && remote.progress.isNotEmpty(),
+            progressDeleted = deletedLocally,
+            searchesApplied = searchesWin && remote.recentSearches != local.recentSearches,
+            skippedOtherServer = !sameServer && (remote.progress.isNotEmpty() || remote.deletedProgress.isNotEmpty()),
         )
         return result to merged
     }

@@ -74,13 +74,13 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
   `ReaderViewModel`이 마지막 3페이지 안에 들면 다음 항목(탄코본 제외)의 메타데이터를 한 번 받아 `nextArchive`로 둔다. 마지막 페이지에
   카드가 뜨고, 마지막 페이지에서 "다음" 탭/키를 누르면 `ReaderRoute(next)`로 교체(`popUpTo<ReaderRoute> inclusive`). 큐는 메모리에만.
 - **밝기·색 필터(P1-3)**: 밝기는 `window.attributes.screenBrightness`(리더 안에서만, 나가면 `BRIGHTNESS_OVERRIDE_NONE`). 색 필터는
-  RenderEffect(API 31+) 대신 `graphicsLayer(Offscreen)` + `drawWithContent`의 블렌드(Saturation=흑백, Multiply=세피아/따뜻하게)로 API 28에서도 동작.
+  v0.1.7부터 `saveLayer(paint.colorFilter = ColorMatrix)` 레이어(전 버전 동작). v0.1.4의 블렌드 방식(Saturation/Multiply)은 API 29+ 전용이라 Android 9에서 페이지를 덮었다(TROUBLESHOOTING H-10).
 - **기기 간 동기화(v0.1.5)**: 서버(LANraragi)에는 임의 데이터를 둘 곳이 없어 **사용자가 고른 JSON 파일 하나**(SAF, 영구 권한)를
   두 기기가 공유한다 — Synology Drive/Google Drive/Nextcloud 등 문서 제공자가 파일을 옮긴다. `data/sync/SyncManager.sync()` =
   읽기 → 병합 → 다시 쓰기, 앱 시작(30초 스로틀)·백그라운드 진입·수동 버튼에서 실행. 병합 규칙(`SyncMerge`, 순수 함수·테스트):
   설정 묶음과 카테고리 순서는 `…ChangedAt`이 더 큰 쪽이 이김, 읽기 기록은 작품별로 `lastReadAt`이 큰 행, 검색 기록은 합집합(10개).
   다른 서버(host+port+path)의 기록·순서는 합치지 않는다. 파일에 **서버 주소·API 키·캐시 크기·격자 너비·밝기는 넣지 않음**(비밀/기기별).
-  삭제는 전파되지 않는다(툼스톤 없음, 결정 — 단순성). 같은 형식으로 1회성 백업 내보내기/가져오기(병합)도 제공.
+  삭제는 v0.1.7부터 툼스톤으로 전파된다(삭제 후 다시 읽은 기록은 남음). 같은 형식으로 1회성 백업 내보내기/가져오기(병합)도 제공.
   평점·즐겨찾기는 이미 서버에 있어 동기화 대상이 아니다(앞의 결정 덕분).
 - **페이지 썸네일 격자(P1-5)**: `POST /api/archives/{id}/files/thumbnails`로 전체 페이지 썸네일 생성을 요청하고 minion 작업이 끝나면
   `thumbnail?page=N&no_fallback=true`를 쓴다(no_fallback 없이 부르면 생성 전 자리표시 이미지가 그 URL로 캐시돼 버림). 구서버(404)·실패 시
@@ -98,6 +98,20 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
   블록을 취소하면 손을 뗀 뒤 0.7초 후 재개, 끝에 닿으면 멈추고 메뉴(마지막 페이지 카드) 표시. 속도 1~10 = 30~300dp/s.
 - **웹툰 페이지 간격**: 페이지의 마지막 행 아래에만 여백(`isPageEnd`) — 한 페이지의 타일 사이에는 넣지 않는다.
 - **서재 목록 보기**: 같은 그리드를 `GridCells.Fixed(1)` + `ArchiveListRow`(표지·제목·작가/시리즈·페이지/진행률·★·♥)로. 기기별 설정(동기화 제외).
+- **연속 보기(v0.1.7)**: 읽기 방향에 `CONTINUOUS_LTR`/`CONTINUOUS_RTL`(가로 연속, 끌어서) 추가 — `HorizontalStripReader`(LazyRow, RTL은 reverseLayout,
+  페이지 폭 = 화면 높이 × 치수 캐시의 종횡비, 줌 없음). 하단 바 "연속 보기" 버튼은 `continuousToggle()`(순수 함수): 넘김 모드 → 웹툰(세로 연속),
+  연속 → 직전 선택(없으면 기본값; 기본값도 연속이면 RTL 넘김). 판별은 `ReadingModes.kt`의 `isContinuous/isRightToLeft/isHorizontalContinuous`.
+- **전체 페이지 화면(v0.1.7)**: 상세 → "전체 페이지" → `PagesRoute(id)` `PageOverviewScreen`. 썸네일 생성/대체 로직은 `PageThumbnailSource`로 빼서
+  리더 격자 시트와 공유, 격자 UI도 `PageThumbnailGrid` 하나. 셀 크기 5단계(확대/축소 버튼), 탭하면 그 페이지부터 리더.
+- **키보드·리모컨·터치패드(Rii i4 등, v0.1.7)**: `MainActivity.dispatchKeyEvent`에서 가로챈다(Compose 포커스 이동이 방향키/Enter를 먼저 먹기 때문).
+  매핑은 `ReaderKeyEvents.map()`(순수 함수·테스트): 방향키/PgUp·Dn/Space/Enter/미디어 이전·다음 = 넘김(Shift+Space·Backspace = 이전),
+  Home/End, M·메뉴 키 = 메뉴, G = 페이지 목록, W = 연속 보기, A·재생/일시정지 = 웹툰 자동 스크롤, Esc = 나가기. 방향키만 길게 누르면 반복.
+  마우스: 오른쪽 클릭 = 메뉴, 휠·두 손가락 스크롤 = 넘김 모드에선 페이지 넘김(280ms에 1장), 가로 연속에선 0.3화면 이동, 웹툰은 리스트 기본 스크롤.
+  (리더 루트 `pointerInput`, `PointerEventPass.Initial`에서 소비해 telephoto/pager가 같은 이벤트를 다시 처리하지 않게 함.)
+- **넘김 모드 이동은 슬롯 단위**: 탭·키·휠은 `stepEvents(±1)`로 페이저 슬롯을 움직이고, 경계를 넘으면 `onPastEdge`. 페이지 번호 점프(슬라이더·목차·격자)만 `jumpEvents`.
+- **리더 세션**: 창 상태(밝기·화면 켜짐·컷아웃·회전)와 키 활성은 ref-count된 세션이 소유, 마지막 리더가 나갈 때만 복구. 키는 최신 세션만 처리.
+- **동기화 삭제 전파**: Room v4 `history_tombstone` + 파일 `deletedProgress`(90일). 검색 기록은 합집합 대신 `searchesChangedAt` 최신 승리.
+  "평문 HTTP 허용"은 기기별로 변경(동기화 제외). 앱 잠금 화면은 전체 화면 Dialog 창.
 - 의도적으로 하지 않은 것: 멀티모듈, DI 프레임워크, `strings.xml` 분리(개인용·한국어 단일; 공개 배포 시 재검토).
 
 ## 4. LANraragi API 메모 (소스 `tools/openapi.yaml`, `Controller/Api/*.pm` 확인)
@@ -138,6 +152,7 @@ val date = 1000 * (getNSTag(arc.tags, "date_added")?.first()?.toLong() ?: 0)
 v0.1.2: 페이지 치수 캐시 · 웹툰 세로 스트립 타일링(2048px 밴드, 영역 디코딩) · 실제 종횡비 레이아웃 · 웹툰 모드 제안 스낵바.
 v0.1.3: 가로 모드 양면 보기(표지 단독·가로 페이지 단독 옵션) · 웹툰 레이아웃 줌(1~3×, 더블 탭 2×).
 v0.1.4: 마지막 페이지에서 다음 작품 카드/넘김 · 리더 밝기(1~100%) · 색 필터(흑백/세피아/따뜻하게).
+v0.1.7: 가로 연속(끌어서) 모드 · 연속 보기 버튼 · 전체 페이지 화면 · 키보드/리모컨/터치패드 최적화(Rii i4 등) · 전체 코드 검토 반영.
 v0.1.6: 앱 잠금·최근 앱 숨기기 · 웹툰 자동 스크롤·페이지 간격 · 서재 목록 보기.
 v0.1.5: 동기화 파일·백업 · 카드 빠른 메뉴 · 리더 마지막 페이지 별점 · 페이지 격자 · 검색 자동완성/기록 · 이어 읽기 줄 · 페이지 공유/저장/썸네일 지정 · 넘김 애니메이션.
 
