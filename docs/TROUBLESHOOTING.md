@@ -230,7 +230,9 @@
 - 원인: `C:\Project\개인용`이 Synology Drive 동기화 폴더라 **빌드 산출물(`app/build`, `.gradle`)까지 올리고, 일부를 온디맨드 자리표시로 바꾼다**
   (2026-10-22 확인 시 `app/build` 아래 2,862개). Gradle은 자리표시를 일반 파일로 읽지 못한다. 메모리의 "덧붙여 쓴 파일이 되돌려짐"과 같은 원인.
 - 즉시 해결: 문제 폴더(`app/build/test-results/testDebugUnitTest`)를 지우고 다시 빌드.
-- 근본 해결(사용자 PC 설정): Synology Drive 클라이언트 → 동기화 작업 → 설정 → **파일 필터/선택적 동기화**에서 `build`, `.gradle` 폴더를 제외하거나,
+- **적용함(2026-10-22)**: 저장소를 `C:\dev\lanraragi-app`(동기화 안 됨, ASCII)으로 새로 clone → 테스트 70개·Lint·APK 통과, `app/build` 자리표시 0개,
+  Git Bash `./gradlew`도 동작(F-1·F-2의 한글 경로 문제가 이 경로에선 없음). 예전 폴더는 지우지 않고 남겨 둠(서명 키 `release.jks`가 거기 있음).
+- 다른 방법: Synology Drive 클라이언트 → 동기화 작업 → 설정 → **파일 필터/선택적 동기화**에서 `build`, `.gradle` 폴더를 제외하거나,
   저장소를 동기화되지 않는 경로(예: `C:\dev\lanraragi-app`)로 옮긴다(그러면 F-1·F-2 한글 경로 우회도 필요 없어짐). 서명 APK는 CI에서만 만들므로 배포물엔 영향 없음.
 
 ## H. 전체 코드 검토(2026-10-22, v0.1.7)에서 찾아 고친 결함

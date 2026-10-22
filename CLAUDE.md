@@ -35,7 +35,8 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
 - 로컬 PC(Android Studio)에서는 `./gradlew :app:testDebugUnitTest :app:assembleDebug`.
   Windows에서는 PowerShell에서 `.\gradlew.bat …`(Git Bash의 `./gradlew`는 한글 경로가 깨짐). 한글 경로·hosts 광고 차단과
   관련된 함정과 사용자 전역 `~/.gradle/gradle.properties` 설정은 `docs/TROUBLESHOOTING.md` §F.
-- 이 PC의 저장소는 Synology Drive 동기화 폴더 안이다. 빌드가 `not a regular file`로 실패하면 `docs/TROUBLESHOOTING.md` §F-6.
+- 로컬 작업 위치는 **`C:\dev\lanraragi-app`**(2026-10-22부터, Synology Drive 밖·ASCII 경로). 예전 `C:\Project\개인용\lanraragi-app`은
+  동기화 폴더라 빌드 산출물이 자리표시로 바뀌어 실패했다(§F-6). 여기서는 Git Bash `./gradlew`도 동작한다.
 - 릴리스: `git tag vX.Y.Z && git push origin vX.Y.Z` → `Release` 워크플로가 서명 APK +
   `SHA256SUMS.txt`를 GitHub Release에 올림 → 앱이 자동 감지. 저장소 secrets 필요
   (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).
