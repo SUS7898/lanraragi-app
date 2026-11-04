@@ -76,6 +76,8 @@ class ReaderViewModel(
     private val _state = MutableStateFlow(UiState())
     val state = _state.asStateFlow()
 
+    // Every property stays above init: members initialize in text order, and viewModelScope runs on Main.immediate,
+    // so a launch in init starts on the spot and would read anything declared below it as null.
     private var archive: Archive? = null
     private var serverTracksProgress: Boolean? = null
     private var clearedNew = false
@@ -83,6 +85,10 @@ class ReaderViewModel(
     private val prefetched = HashSet<Int>()
     private val sizeRequests = HashSet<Int>()
     private var nextLoaded = false
+    private val thumbnails = PageThumbnailSource(deps.api, deps.store, arcId)
+
+    /** Override in use before switching to a continuous mode, so the toggle can go back to it. */
+    private var overrideBeforeContinuous: ReadingMode? = null
 
     init {
         load()
@@ -272,16 +278,11 @@ class ReaderViewModel(
 
     // ------------------------------------------------------------------ page grid (shared with the overview screen)
 
-    private val thumbnails = PageThumbnailSource(deps.api, deps.store, arcId)
-
     fun preparePageThumbnails() = thumbnails.prepare(viewModelScope)
     fun pageThumbnailUrl(index: Int): String = thumbnails.url(index, _state.value.pages)
     fun onThumbnailError(url: String) = thumbnails.onError(url)
 
     // ------------------------------------------------------------------ "연속 보기" toggle
-
-    /** Override in use before switching to a continuous mode, so the toggle can go back to it. */
-    private var overrideBeforeContinuous: ReadingMode? = null
 
     fun toggleContinuous() {
         val current = _state.value.readingModeOverride

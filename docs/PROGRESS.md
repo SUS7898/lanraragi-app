@@ -1,6 +1,6 @@
 # 진행 상황 (PROGRESS)
 
-마지막 갱신: 2026-10-22 (세션 3, 로컬 PC) — 로컬 작업 위치를 `C:\dev\lanraragi-app`으로 이전(Synology 동기화 회피, §F-6). v0.1.7: 가로 연속·연속 보기, 전체 페이지 화면, Rii i4 등 키보드/리모컨/터치패드, 전체 코드 검토 결함 12건 수정. 그 전 v0.1.6: 앱 잠금·최근 앱 숨기기, 웹툰 자동 스크롤·페이지 간격, 서재 목록 보기. 그 전 v0.1.5: 기기 간 동기화 파일·백업, 별점 접근성(카드 빠른 메뉴·리더 마지막 페이지), 페이지 격자·검색 자동완성/기록·이어 읽기·페이지 공유/저장/썸네일 지정·넘김 애니메이션. 다음은 실기기 §9b~§9f 결과 수집.
+마지막 갱신: 2026-11-04 (세션 4, 로컬 PC) — v0.1.8 핫픽스: v0.1.7에서 리더를 열면 앱이 종료되던 `ReaderViewModel` 초기화 순서 NPE 수정(§I-1). 그 전(2026-10-22): 로컬 작업 위치를 `C:\dev\lanraragi-app`으로 이전(Synology 동기화 회피, §F-6). v0.1.7: 가로 연속·연속 보기, 전체 페이지 화면, Rii i4 등 키보드/리모컨/터치패드, 전체 코드 검토 결함 12건 수정. 그 전 v0.1.6: 앱 잠금·최근 앱 숨기기, 웹툰 자동 스크롤·페이지 간격, 서재 목록 보기. 그 전 v0.1.5: 기기 간 동기화 파일·백업, 별점 접근성(카드 빠른 메뉴·리더 마지막 페이지), 페이지 격자·검색 자동완성/기록·이어 읽기·페이지 공유/저장/썸네일 지정·넘김 애니메이션. 다음은 실기기 §9b~§9f 결과 수집.
 
 ## 상태 요약
 - [x] 요구사항 분석, Mihon 오류 원인 확인, LANraragi API 소스 확인
@@ -40,7 +40,9 @@
 - [x] v0.1.7: 가로 연속 모드·연속 보기 버튼(`continuousToggle`), 전체 페이지 화면(`PageThumbnailSource`/`PageThumbnailGrid` 공유),
       Rii i4 등 키보드/리모컨/터치패드(`dispatchKeyEvent`, `ReaderKeyEvents.map`), 전체 코드 검토 반영
 - [x] v0.1.7 릴리스 게시 (Release run 39692496754)
-- [ ] v0.1.7 실기기 테스트 (§9h)
+- [ ] v0.1.7 실기기 테스트 (§9h) — v0.1.7은 리더를 열면 죽으므로 건너뛰고 v0.1.8로 시험
+- [x] v0.1.8(핫픽스): 리더를 열면 종료되던 초기화 순서 NPE 수정 + 회귀 테스트 `ReaderViewModelInitTest` (§I-1)
+- [ ] v0.1.7에서 추가된 리더 경로 전체의 실행 점검(한 번도 실행되지 않고 배포됨): 에뮬레이터 점검 진행 중
 - [ ] 실기기 피드백 반영 (제스처 감도, 웹툰 모드 줌, 탭존 비율 등)
 
 ## 다음 세션이 할 일 (우선순위)
@@ -85,3 +87,7 @@
 | 2026-10-22 | CI run 39692041501 + Security Scan run 39692041672 (커밋 1f9a66c, v0.1.7) | ✅ 전부 성공 |
 | 2026-10-22 | Release run 39692496754 (태그 v0.1.7) | ✅ lrr-viewer-v0.1.7.apk · SHA256SUMS · SIGNING-CERT · idsig · mapping 게시 |
 | 2026-10-22 | 새 위치 `C:\dev\lanraragi-app` 첫 빌드 (`.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`, Git Bash `./gradlew help`) | ✅ 70 tests, Lint 0 errors, 자리표시 파일 0개 |
+| 2026-11-04 | 에뮬레이터(2560×1600·1080×2340, API 34) + v0.1.7 릴리스 APK + 모의 서버 | ❌ 두 크기 모두 리더를 열면 NPE로 종료, `mapping-v0.1.7.txt`로 `ReaderViewModel.kt:89` 확인(§I-1) |
+| 2026-11-04 | `ReaderViewModelInitTest`를 수정 전 코드에 실행 | ✅ 의도대로 실패(같은 NPE, 2/2) → 수정 후 통과 |
+| 2026-11-04 | 로컬 v0.1.8 (`.\gradlew.bat :app:testDebugUnitTest :app:lintDebug :app:assembleDebug`) | ✅ 72 tests, Lint 0 errors/13 warnings(버전 핀) |
+| 2026-11-04 | 에뮬레이터(2560×1600, API 34) + 수정본 R8 릴리스 APK + 모의 서버 | ✅ 리더 열림, 양면에서 6번 넘겨도 크래시 없음. 전체 시나리오 점검은 진행 중 |

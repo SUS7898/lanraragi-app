@@ -21,6 +21,8 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
 - 동기화 대상 설정을 추가하면 `SyncedSettings`(from/applyTo)에도 넣는다. 기기별·비밀 값(서버 주소, API 키, 평문 HTTP 허용, 밝기, 격자 너비, 잠금)은 넣지 않는다.
 - 리더의 창 상태(밝기·화면 켜짐·컷아웃·회전·키 활성)는 세션 효과 한 곳에서 ref-count로 복구한다(`ReaderKeyEvents.enterReader/exitReader`). 설정별 효과에 onDispose 복구를 다시 넣지 말 것.
 - `pointerInput(Unit)` 안에서 쓰는 콜백·목록은 `rememberUpdatedState`로 최신 값을 읽는다. 코루틴의 `catch (e: Exception)`은 `CancellationException`을 먼저 다시 던진다.
+- 클래스 속성은 전부 `init` 블록보다 위에 선언한다. `viewModelScope`는 `Main.immediate`라 `init`의 `launch`가 그 자리에서 실행되고, 아래쪽 속성은 아직 null이다(§I-1). ViewModel을 추가하면 생성자를 실제로 돌리는 테스트도 함께 둔다.
+- 릴리스 태그 전에 R8이 적용된 APK를 에뮬레이터에 설치해 리더를 실제로 열어 본다. CI는 컴파일·단위 테스트·린트까지만 검증한다(v0.1.7이 이 때문에 리더를 열면 죽는 채로 나갔다, §I-1. 에뮬레이터 함정은 §F-7).
 - 한국어가 바로 뒤에 오는 문자열 템플릿은 `"${n}점"`처럼 중괄호 필수 (`"$n점"`은 식별자 `n점`으로 해석됨).
 - 새 화면은 `ui/AppRoot.kt`에 `@Serializable` 라우트로 추가한다(문자열 라우트 금지). 로컬 저장은 Room 엔티티에 `serverId` 컬럼 필수.
 - Room 엔티티를 바꾸면 version 증가 + Migration/AutoMigration, 로컬 빌드로 `app/schemas/` 갱신 후 커밋.

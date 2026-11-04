@@ -235,6 +235,29 @@
 - 다른 방법: Synology Drive 클라이언트 → 동기화 작업 → 설정 → **파일 필터/선택적 동기화**에서 `build`, `.gradle` 폴더를 제외하거나,
   저장소를 동기화되지 않는 경로(예: `C:\dev\lanraragi-app`)로 옮긴다(그러면 F-1·F-2 한글 경로 우회도 필요 없어짐). 서명 APK는 CI에서만 만들므로 배포물엔 영향 없음.
 
+### F-7. 이 PC에서 에뮬레이터로 릴리스 APK를 돌릴 때의 함정
+- `adb server version (36) doesn't match this client (41); killing`이 반복되고 기기 연결이 끊김: 에뮬레이터가 PATH의 첫 `adb`(Nox `D:\Program Files\Nox\bin`)를 호출해 서버를 죽인다.
+  → 에뮬레이터를 켜는 셸의 PATH에서 Nox를 빼고 SDK `platform-tools`를 맨 앞에 두며, `ANDROID_ADB_SERVER_PORT=5099`로 전용 서버를 쓴다.
+- qemu가 `0xc0000005`로 갑자기 죽거나 Gradle 데몬이 `Native memory allocation (malloc) failed`와 `hs_err_pid*.log`를 남기고 사라짐: **시스템 커밋 메모리 고갈**.
+  이벤트 로그 `Microsoft-Windows-Resource-Exhaustion-Detector` 2004의 시각과 일치한다. 에뮬레이터(약 4.5GB)와 Gradle, 다른 무거운 작업을 동시에 돌리지 않는다.
+  빌드는 `"-Dorg.gradle.jvmargs=-Xmx2g -XX:+UseParallelGC" "-Pkotlin.compiler.execution.strategy=in-process"`로 줄일 수 있다.
+- PowerShell 5.1은 따옴표 없는 `-PappVersionName=0.1.8`을 `-PappVersionName=0`과 `.1.8`로 쪼갠다(`versionCode is set to 0`). 반드시 `"-PappVersionName=0.1.8"`처럼 묶는다.
+- 키보드 없는 태블릿 재현: AVD의 `hw.keyboard=no`만으로는 `AT Translated Set 2 keyboard` 때문에 구성이 계속 `qwerty`다. google_apis 이미지에서 `adb root` 후 `rm /dev/input/event1`로 지우면 `nokeys`가 된다(재부팅하면 복구).
+  키보드·마우스 연결은 게스트의 `uinput -`에 JSON으로 가상 장치를 등록해 흉내 낸다.
+
+## I. 앱이 실행 중에 종료되거나 리더에서 나가지는 문제 (v0.1.8~)
+
+### I-1. v0.1.7에서 리더를 열면 앱이 바로 종료됨 (CRITICAL, v0.1.8에서 수정)
+- 증상: v0.1.7에서 작품을 열면 어떤 기기든 즉시 종료. 태블릿에서 먼저 보고됐다. 폰이 정상이었다면 폰은 아직 v0.1.6 이하였다는 뜻이다(이 크래시는 화면 크기와 무관하게 결정적이라 v0.1.7 폰에서도 난다. 폰 크기 에뮬레이터에서 확인).
+- 스택(릴리스 APK, `mapping-v0.1.7.txt`로 복원): `NullPointerException` at `ReaderViewModel$1.invokeSuspend(ReaderViewModel.kt:89)` ← `ReaderViewModel.<init>` ← `ReaderScreen.kt:82`.
+- 원인: Kotlin은 속성 초기화와 `init`을 **소스 순서대로** 실행한다. `init`의 `viewModelScope.launch { thumbnails.state.collect … }`는 `Dispatchers.Main.immediate`라 그 자리에서 바로 실행되는데,
+  `thumbnails`는 클래스 아래쪽에 선언되어 아직 null이었다. v0.1.7 리팩터링(1f9a66c)이 만든 결함이다.
+- 왜 CI가 못 잡았나: CI는 컴파일·단위 테스트·린트만 본다. `ReaderViewModel`을 실제로 생성하는 테스트가 없었고 리더를 실행해 본 적도 없었다.
+  결과적으로 **v0.1.7의 리더 변경분 전체가 한 번도 실행되지 않은 채 배포됐다.**
+- 해결: 속성을 모두 `init` 위로 옮기고, 그 규칙을 주석과 `CLAUDE.md`에 남겼다. 생성자를 실제로 돌리는 회귀 테스트 `ReaderViewModelInitTest`를 추가했다(수정 전 코드에서 같은 NPE로 실패 → 수정 후 통과 확인).
+  저장소 전체에서 `init` 뒤에 선언된 속성은 이제 없다.
+- 재발 방지: 릴리스 전에 R8이 적용된 APK를 에뮬레이터에 설치해 리더를 실제로 열어 본다(§F-7, BACKLOG P0-5).
+
 ## H. 전체 코드 검토(2026-10-22, v0.1.7)에서 찾아 고친 결함
 
 ### H-1. 양면 보기에서 탭/키 "다음"이 같은 자리에서 멈춤, 마지막 짝의 마지막 페이지에 도달 못 함 (HIGH)
