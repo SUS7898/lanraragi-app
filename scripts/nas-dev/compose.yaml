@@ -13,6 +13,6 @@ services:
     environment:
       TZ: Asia/Seoul
     volumes:
-      - /volume1/dev/home:/home/dev   # Claude 로그인·설정, ~/.gradle 캐시, SSH 키
-      - /volume1/dev/work:/work       # 저장소 체크아웃
+      - /volume1/docker/claude/dev/home:/home/dev   # Claude 로그인·설정, ~/.gradle 캐시, SSH 키
+      - /volume1/docker/claude/dev/work:/work       # 저장소 체크아웃
     # docker.sock, LANraragi 데이터 폴더, 서명 키는 마운트하지 않는다.
