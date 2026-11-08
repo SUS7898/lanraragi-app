@@ -22,7 +22,12 @@ RUN curl -fsSL https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/bi
 # Chrome (헤드리스 확인용: Librario navrig 는 /usr/bin/google-chrome 을 찾는다. Ubuntu chromium 은 snap 이라 컨테이너에서 안 됨)
 RUN curl -fsSLo /tmp/chrome.deb https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb \
  && apt-get update && apt-get install -y --no-install-recommends /tmp/chrome.deb \
- && rm -rf /tmp/chrome.deb /var/lib/apt/lists/*
+ && rm -rf /tmp/chrome.deb /var/lib/apt/lists/* \
+ && printf '#!/bin/sh\nexec /usr/bin/google-chrome --no-sandbox "$@"\n' > /usr/local/bin/chrome-nosandbox \
+ && chmod 755 /usr/local/bin/chrome-nosandbox
+# Docker 기본 seccomp 가 Chrome 의 사용자 네임스페이스 샌드박스를 막는다 → --no-sandbox 래퍼를 쓴다.
+# 컨테이너가 바깥 격리를 맡는다. navrig(rig.mjs)는 CHROME 환경 변수를 먼저 본다.
+ENV CHROME=/usr/local/bin/chrome-nosandbox
 
 ENV ANDROID_HOME=/opt/android-sdk
 ENV PATH=$PATH:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:/home/dev/.local/bin

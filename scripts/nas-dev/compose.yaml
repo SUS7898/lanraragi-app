@@ -9,11 +9,20 @@ services:
     restart: unless-stopped
     init: true               # 남는 Gradle/Kotlin 데몬 프로세스 회수
     command: sleep infinity
-    mem_limit: 10g           # 18GB 중 DSM·LANraragi 몫을 남김
+    # 자원 상한: NAS(DSM·LANraragi)가 빌드 중에도 응답하도록
+    mem_limit: 10g
+    cpus: "3"                # 4코어 중 1코어는 NAS 몫
+    pids_limit: 4096
     shm_size: 1g             # 헤드리스 Chrome이 기본 /dev/shm(64MB)에서 죽는 것 방지
+    # 보안: 일반 사용자(dev)로 실행, 권한 상승 금지, 포트 공개 없음(바깥으로 나가는 연결만)
+    security_opt:
+      - no-new-privileges:true
+    # 새 Docker 네트워크를 만들지 않고 기본 bridge(docker0)를 쓴다. compose 프로젝트마다 새 대역을 잡다가
+    # 172.17~31 이 다 차면 192.168.x.0/20 을 쓰는데, 그게 집 LAN 대역과 겹치면 NAS 접속이 끊긴다.
+    network_mode: bridge
     environment:
       TZ: Asia/Seoul
     volumes:
-      - /volume1/docker/claude/dev/home:/home/dev   # Claude 로그인·설정, ~/.gradle 캐시, SSH 키
+      - /volume1/docker/claude/dev/home:/home/dev   # Claude 로그인·설정, git 자격 증명, ~/.gradle 캐시
       - /volume1/docker/claude/dev/work:/work       # 저장소 체크아웃
-    # docker.sock, LANraragi 데이터 폴더, 서명 키는 마운트하지 않는다.
+    # 마운트하지 않는 것: docker.sock(=NAS root 권한), LANraragi 데이터, 서명 키(keystore), 다른 공유 폴더.
