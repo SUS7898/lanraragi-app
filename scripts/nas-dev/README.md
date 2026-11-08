@@ -5,11 +5,27 @@ RAM 18GB(기본 2GB + 16GB) 기준. Container Manager(Docker) 필요.
 
 ## 1. 준비 (최초 1회)
 1. File Station에서 공유 폴더 `dev`를 만들고 그 안에 `home`, `work` 폴더를 만든다.
-   **Synology Drive 동기화 대상에 넣지 말 것** — 자리표시 파일로 빌드가 깨진다(TROUBLESHOOTING §F-6).
-2. 제어판 → 터미널 및 SNMP → SSH 활성화. 외부 접속은 포트 개방 대신 Tailscale 패키지를 쓴다.
-3. 이 폴더(`Dockerfile`, `compose.yaml`)를 NAS의 `/volume1/dev/nas-dev/`에 복사한다.
-4. SSH로 접속해 `id -u`로 UID를 확인하고 `compose.yaml`의 `UID`를 맞춘다.
-5. 빌드·기동:
+   - **Synology Drive 동기화 대상에 넣지 말 것** — 자리표시 파일로 빌드가 깨진다(TROUBLESHOOTING §F-6).
+   - **경로에 한글을 넣지 말 것** — AGP가 비ASCII 경로에서 빌드를 거부한다(§F-1).
+     기존 백업/동기화 폴더(예: `/volume1/Tier/.../백업/개인/Project`)를 작업 폴더로 쓰지 말고 `work`에 새로 clone한다.
+2. SSH 켜기: DSM 제어판 → 터미널 및 SNMP → 터미널 → "SSH 서비스 활성화"(포트 22) → 적용.
+   SSH 로그인은 **administrators 그룹** 계정만 가능하다. 외부 접속은 포트 개방 대신 Tailscale 패키지를 쓴다.
+3. NAS IP 확인: 제어판 → 네트워크 → 네트워크 인터페이스(예: `192.168.0.10`).
+4. 같은 내부망 PC의 PowerShell에서 접속 (Windows 10/11 기본 내장 ssh):
+   ```powershell
+   ssh <DSM계정>@192.168.0.10        # 처음엔 지문 확인에 yes, 비밀번호는 DSM 비밀번호
+   ```
+   폰에서는 Termius 같은 SSH 앱으로 같은 주소·계정을 쓴다.
+5. NAS에서 UID 확인 후 설정 파일 받기:
+   ```bash
+   id -u                                   # 이 값을 compose.yaml 의 UID 에 넣는다
+   mkdir -p /volume1/dev/nas-dev && cd /volume1/dev/nas-dev
+   B=https://raw.githubusercontent.com/SUS7898/lanraragi-app/main/scripts/nas-dev
+   curl -fsSLO $B/Dockerfile && curl -fsSLO $B/compose.yaml
+   vi compose.yaml                         # UID 수정 (i 로 편집, Esc → :wq 저장)
+   ```
+   (브랜치가 아직 main에 합쳐지지 않았다면 `main` 자리에 작업 브랜치 이름을 넣는다.)
+6. 빌드·기동:
    ```bash
    cd /volume1/dev/nas-dev && sudo docker compose up -d --build
    ```
