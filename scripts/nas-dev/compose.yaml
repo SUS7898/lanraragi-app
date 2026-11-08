@@ -1,0 +1,18 @@
+# 사용: NAS에 SSH 접속 후 이 폴더에서  sudo docker compose up -d --build
+services:
+  claude:
+    build:
+      context: .
+      args:
+        UID: "1026"          # NAS에서 `id -u` 값으로 바꿀 것
+    container_name: claude-dev
+    restart: unless-stopped
+    init: true               # 남는 Gradle/Kotlin 데몬 프로세스 회수
+    command: sleep infinity
+    mem_limit: 10g           # 18GB 중 DSM·LANraragi 몫을 남김
+    environment:
+      TZ: Asia/Seoul
+    volumes:
+      - /volume1/dev/home:/home/dev   # Claude 로그인·설정, ~/.gradle 캐시, SSH 키
+      - /volume1/dev/work:/work       # 저장소 체크아웃
+    # docker.sock, LANraragi 데이터 폴더, 서명 키는 마운트하지 않는다.
