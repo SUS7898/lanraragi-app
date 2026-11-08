@@ -87,6 +87,7 @@ NAS 재부팅·Container Manager 업데이트 뒤에는 컨테이너는 자동�
 (SSH 대신 DSM → Container Manager → 컨테이너 → claude-dev → 터미널에서도 된다).
 
 ## 보안 메모
+- 메모리 6g(스왑 금지)·CPU 3코어 상한, watchtower 제외 라벨.
 - 컨테이너는 일반 사용자 `dev`, `no-new-privileges`, 포트 공개 없음, sudo 없음. 마운트는 `home`·`work` 둘뿐.
   docker.sock·LANraragi 데이터·서명 키(`pocketrisu-app-keystore` 등)는 절대 마운트하지 않는다.
 - 남는 위험: 컨테이너는 집 LAN에 닿는다(LANraragi 실서버 테스트용). DSM·공유기 관리 화면은 비밀번호·2단계 인증으로 지킨다.

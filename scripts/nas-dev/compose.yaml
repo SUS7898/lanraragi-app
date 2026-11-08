@@ -9,9 +9,16 @@ services:
     restart: unless-stopped
     init: true               # 남는 Gradle/Kotlin 데몬 프로세스 회수
     command: sleep infinity
-    # 자원 상한: NAS(DSM·LANraragi)가 빌드 중에도 응답하도록
-    mem_limit: 10g
+    # 자원 상한: NAS(DSM·LANraragi·Jellyfin 등)가 빌드 중에도 응답하도록.
+    # 실측(2026-11-08): 17Gi 중 기존 컨테이너 10개가 ~6Gi 사용, available 9.5Gi, 스왑 이미 3.9Gi 사용 중
+    # → 6g 로 제한하고 스왑은 못 쓰게(memswap=mem) 한다. 넘으면 NAS 전체가 스왑으로 느려지는 대신
+    #   이 컨테이너 안의 빌드만 OOM 으로 죽는다. Android 빌드와 Librario 작업을 동시에 돌리지 말 것.
+    mem_limit: 6g
+    memswap_limit: 6g
     cpus: "3"                # 4코어 중 1코어는 NAS 몫
+    labels:
+      # 로컬에서 빌드한 이미지라 레지스트리에 없다 → watchtower 가 갱신을 시도하지 않게
+      com.centurylinklabs.watchtower.enable: "false"
     pids_limit: 4096
     shm_size: 1g             # 헤드리스 Chrome이 기본 /dev/shm(64MB)에서 죽는 것 방지
     # 보안: 일반 사용자(dev)로 실행, 권한 상승 금지, 포트 공개 없음(바깥으로 나가는 연결만)
