@@ -39,7 +39,7 @@ GitHub Releases 기반 자체 업데이트, CI에서 서명·보안 스캔.
   관련된 함정과 사용자 전역 `~/.gradle/gradle.properties` 설정은 `docs/TROUBLESHOOTING.md` §F.
 - 로컬 작업 위치는 **`C:\dev\lanraragi-app`**(2026-10-22부터, Synology Drive 밖·ASCII 경로). 예전 `C:\Project\개인용\lanraragi-app`은
   동기화 폴더라 빌드 산출물이 자리표시로 바뀌어 실패했다(§F-6). 여기서는 Git Bash `./gradlew`도 동작한다.
-- NAS(DS423+) 개발 컨테이너로도 작업할 수 있다: `scripts/nas-dev/README.md` (JDK 17 + Android SDK, 로컬 빌드 가능, 에뮬레이터는 불가).
+- NAS(DS423+) 개발 컨테이너로도 작업할 수 있다: 별도 저장소 `SUS7898/nas-devbox` (JDK 17 + Android SDK, 로컬 빌드 가능, 에뮬레이터는 불가).
 - 릴리스: `git tag vX.Y.Z && git push origin vX.Y.Z` → `Release` 워크플로가 서명 APK +
   `SHA256SUMS.txt`를 GitHub Release에 올림 → 앱이 자동 감지. 저장소 secrets 필요
   (`KEYSTORE_BASE64`, `KEYSTORE_PASSWORD`, `KEY_ALIAS`, `KEY_PASSWORD`).
