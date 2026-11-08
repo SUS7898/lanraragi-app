@@ -10,6 +10,7 @@ services:
     init: true               # 남는 Gradle/Kotlin 데몬 프로세스 회수
     command: sleep infinity
     mem_limit: 10g           # 18GB 중 DSM·LANraragi 몫을 남김
+    shm_size: 1g             # 헤드리스 Chrome이 기본 /dev/shm(64MB)에서 죽는 것 방지
     environment:
       TZ: Asia/Seoul
     volumes:
